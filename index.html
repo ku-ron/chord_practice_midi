@@ -47,7 +47,6 @@ body{
 header.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:22px}
 .eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
 h1{font-family:var(--f-display);font-weight:600;font-size:26px;margin:0}
-.sub{color:var(--ivory-dim);font-size:13px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr);gap:28px;align-items:start;justify-items:center}
 .layout .stage{width:100%;max-width:780px}
 .layout.adv{grid-template-columns:360px minmax(0,1fr);justify-items:stretch}
@@ -118,8 +117,8 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
   border-bottom:1px solid var(--line);margin-bottom:6px}
 .wheelfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   padding:12px 4px 4px;border-top:1px solid var(--line);margin-top:8px}
-/* 中身が変わる表示には固定幅を与える。ここが伸び縮みすると、余りを受け持つ
-   スライダーの長さまで動いてしまい、行全体が落ち着かない。 */
+/* 数の表示に固定幅を与える。桁が増えて伸び縮みすると、余りを受け持つスライダーの
+   長さまで動いてしまい、行全体が落ち着かない。 */
 .wheelfoot input[type=range]{flex:1 1 110px;min-width:80px;margin:0}
 .wheelfoot > button{min-width:44px;font-size:16px;line-height:1.2}
 .wheelfoot > button.step{min-width:30px;padding:6px 0;font-size:15px;flex:none}
@@ -127,8 +126,6 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 .wheelfoot .bpm{width:62px;text-align:center}
 .wheelfoot .seg{flex:none}
 .wheelfoot .seg button{padding:6px 7px;font-size:12.5px}
-.wheelfoot .play{margin-left:6px}
-.advtoggle{margin-left:auto}
 /* 画面が狭いとホイールの円も小さくなる。右上の余白に収まる範囲で大きくする。 */
 .play{width:clamp(44px,14vw,64px);height:clamp(44px,14vw,64px);flex:none;border-radius:50%;
   font-size:clamp(15px,4.6vw,21px);line-height:1;
@@ -140,11 +137,10 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 .prog .sep{color:var(--ivory-dim);padding:0 5px}
 .prog .note{font-size:12px;color:var(--ivory-dim)}
 /* ===== MIDI版で足したもの ===== */
-/* 鍵盤は「いま何を押しているか」を映すだけなので、縦は極端に潰してよい。
-   弾くべきコードはホイールに出ているため、コードの大きな表示は置いていない。 */
+/* 鍵盤は「いま何を押しているか」を映すだけ。弾くべきコードはホイールに出ているので、
+   コードの大きな表示は置いていない。
+   高さは直接指定して潰す。幅なりに決めると（viewBoxが100:14でも）画面が広いほど背が伸びる。 */
 .kbwrap{margin:6px 0 0;padding:4px 2px 0}
-/* 幅なりに高さを決めると（100:14でも）画面幅が広いほど背が伸びてしまう。
-   ここは「いま何を押しているか」が読めれば足りるので、高さを直接固定して潰す。 */
 svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .judge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   padding:6px 4px 2px;font-size:12.5px;color:var(--ivory-dim);min-height:26px}
@@ -155,7 +151,8 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .judge .marks{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim)}
 .judge button.sm{padding:3px 8px;font-size:11.5px;line-height:1.3;min-height:0}
 @media (pointer:coarse){.judge button.sm{padding:7px 12px;font-size:12.5px}}
-/* 音名の行。押している音は常に出し、構成音は「音名ヒント」のときだけ出す。 */
+/* 音名の行。ヒントなしは「押している音」、ヒントありは「構成音」＋余分な音だけ。
+   どちらの状態でも高さが変わらないよう、チップの高さと行の最低高を先に決めてある。 */
 .hintrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;
   padding:0 4px 8px;min-height:35px}
 .hintrow .nlab{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;
@@ -171,9 +168,8 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .hintrow .nc.got{background:var(--got-bg);border-color:var(--got-bd);color:var(--got-fg)}
 .hintrow .nc.opt{border-style:dashed}
 .hintrow .nc.bass{outline:2px solid var(--brass);outline-offset:1px}
-/* 接続先の名前は最後まで読めること。長ければ切らずに折り返す。 */
-/* 接続先の名前は長い。ヘッダの隙間に押し込むと何行にも折れて場所を食うので、
-   独立した1行として下に置く。 */
+/* 接続先の名前は長く、最後まで読めないと何につながったか確かめられない。
+   ヘッダの隙間に押し込むと何行にも折れて場所を食うので、独立した1行として下に置く。 */
 #midiState{font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim);
   white-space:normal;overflow-wrap:anywhere;flex:1 0 100%;margin:-8px 0 -4px}
 h1 .ver{font-family:var(--f-mono);font-size:15px;color:var(--brass);letter-spacing:.02em}
@@ -199,8 +195,9 @@ svg.wheel .hit{cursor:pointer;fill:transparent}
   .play{width:clamp(48px,14vw,78px);height:clamp(48px,14vw,78px);
     font-size:clamp(16px,4.6vw,26px);padding:0}
 }
-/* いま弾く区画は光り、次の区画は枠が点滅する。どちらも区画の内側で完結させ、
-   隣を覆わない。描き直しは拍ごとなので、アニメーションもその都度やり直される。 */
+/* いま弾く区画は光り、次の区画は枠が点滅する。どちらも区画の内側で完結させ、隣を覆わない。
+   区画が移ると描き直されてアニメーションもやり直される。逆に、音を弾いた再描画でも
+   やり直されるが、どちらも一瞬で終わるので気にならない（振り子はそうはいかない → 下記）。 */
 svg.wheel .nowcell{animation:nowglow .22s ease-out}
 @keyframes nowglow{from{opacity:.3}to{opacity:1}}
 svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
@@ -595,7 +592,7 @@ const state={
   seq:[], shifts:new Set(), closed:true,
   /* ===== MIDI版で足した状態 ===== */
   practice:'midi',        /* 'midi' = 弾いたら進む / 'tempo' = 拍で進む */
-  tick:0, beatLevel:0, beatIn:-1,   /* メトロノームの向き・強拍の色・コード内の何拍目か */
+  beatIn:-1,              /* コード内の何拍目か（メトロノームの点） */
   bassRule:'root', graceMs:60, settleMs:300, earlyMs:300, showNotes:false,
   onComplete:'loop', done:false,   /* 全部押せたときの振る舞い */
   marks:new Set()         /* 押せたセル。'調のピッチクラス|進行内の位置' */
@@ -955,10 +952,10 @@ function cellText(x,y,am,lines){
 }
 
 /* ===== メトロノーム =====
-   クリック音はiPad内蔵スピーカーだと聞き取りにくい（4章の理由でBluetoothへは流せない）。
-   目でも拍が取れるように、ホイールの右下の余白で振り子を振る。
-   ホイールは拍ごとに組み直されるので、そのたびにCSSアニメーションが最初から始まる。
-   拍の裏表で振る向きを入れ替えると、1拍ぶんの片道がちょうど1周期になる。 */
+   クリック音は内蔵スピーカーだと聞き取りにくい。目でも拍が取れるように、
+   ホイールの右下の余白（円の外）で振り子を振る。
+   ★ 角度はCSSアニメーションではなく音の時計から毎フレーム計算する。ホイールは拍以外の
+   理由でも組み直されるので、アニメーションだと描き直しのたびに頭から始まって跳ね戻る。 */
 /* 振り子の角度。片道が1拍。両端で速度が0になるので実物の振り子のように見える。
    拍ごとに向き(dir)が入れ替わり、前の拍の終わりと次の拍の始まりの角度が一致する。 */
 const METRO_A=27;
@@ -1001,7 +998,7 @@ function metronome(c,W,K,T){
   const px=c+0.74*W, py=c+0.84*W;        /* 支点。円の外側の余白に置く */
   const L=52*K;
   metroPivot={x:px,y:py};
-  const on=state.playing, lv=on?(state.beatLevel|0):0;
+  const on=state.playing;
   if(!on) state.beatIn=-1;
   /* 拍の強弱は下の点の並びで分かるので、錘は再生中つねに明るくしておく
      （拍ごとに灰色へ戻ると、動いているのに死んで見える） */
@@ -1328,14 +1325,12 @@ function schedule(){
   if(nextTime < actx.currentTime) nextTime=actx.currentTime+0.06;
   while(nextTime < actx.currentTime + LOOKAHEAD){
     if(beat<0){
-      const lv=beat===-state.countIn?2:0;
-      click(nextTime, lv);
-      uiQ.push({t:nextTime, count:-beat, lv, tick:beat, bi:-1});
+      click(nextTime, beat===-state.countIn?2:0);
+      uiQ.push({t:nextTime, count:-beat, tick:beat, bi:-1});
     }else{
       const idx=mod(beat,total), ci=Math.floor(idx/per);
-      const lv=idx===0?2:(idx%per===0?1:0);
-      click(nextTime, lv);
-      uiQ.push({t:nextTime, ci, adv:(idx===0&&beat>0), lv, tick:beat, bi:idx%per});
+      click(nextTime, idx===0?2:(idx%per===0?1:0));
+      uiQ.push({t:nextTime, ci, adv:(idx===0&&beat>0), tick:beat, bi:idx%per});
     }
     beat++; nextTime+=spb;
   }
@@ -1351,7 +1346,7 @@ function uiLoop(){
   const lat=outLat();
   while(uiQ.length && uiQ[0].t+lat <= actx.currentTime){
     const e=uiQ.shift();
-    state.tick=e.tick; state.beatLevel=e.lv; state.beatIn=e.bi;
+    state.beatIn=e.bi;
     metroBeatT=e.t; metroDir=mod(e.tick|0,2)?-1:1; metroStarted=true; metroBeatN++;
     if(e.count){ state.countdown=e.count; state.playChord=null; }
     else{
