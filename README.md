@@ -18,9 +18,27 @@
 
 | 環境 | どうするか |
 |---|---|
-| Mac / Windows / Android | **Chrome、Firefox 108+、Edge** でURLを開くだけ |
+| Mac / Windows | **Chrome、Edge、Firefox 108+** でURLを開くだけ |
+| Android（未検証） | **Chrome、Samsung Internet** で開けば動くはず（下記） |
 | iPad / iPhone | **MIDIWeb Browser** でURLを開く |
 | Mac版Safari | MIDIは動きません（ホイールとテンポ再生は動きます） |
+| Firefox for Android | **非対応**（デスクトップ版とは違い Web MIDI がありません） |
+
+### 検証したのはこの2つだけです
+
+**iPad + MIDIWeb Browser + Roland DP603（Bluetooth MIDI）** と **Mac版Chrome** の2経路だけを実機で確認しています。それ以外は未検証です。
+
+### Androidタブレットについて（未検証）
+
+手元に実機が無いため確かめていません。以下は資料上の話です。
+
+- [caniuse](https://caniuse.com/midi) では **Chrome for Android と Samsung Internet は Web MIDI に対応**とされています。**Firefox for Android は非対応**です（デスクトップ版が108で対応したのとは別なので注意）
+- つなぎ方は2通り考えられます
+  - **USB（OTG）** — Android 6 以降はUSB MIDIをOS側が扱えるので、こちらのほうが素直に動く見込みが高いです
+  - **Bluetooth MIDI** — Android 6 以降 BLE MIDI 自体は扱えますが、**OSでペアリングした機器が Chrome の Web MIDI のデバイス一覧に出るかどうかは確認できていません**
+- **試された方は結果を教えてください。** 動いた／動かなかったが分かればここに書きます
+
+なお、うまくいかないときの切り分けには **[MIDIモニタ](https://ku-ron.github.io/chord_practice_midi/monitor.html)** が使えます。デバイスが1つも見えないのか、見えるが信号が来ないのかが分かります。
 
 ---
 
