@@ -179,19 +179,11 @@ svg.wheel .nowcell{animation:nowglow .22s ease-out}
 @keyframes nowglow{from{opacity:.3}to{opacity:1}}
 svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
 @keyframes nextblink{from{opacity:1}to{opacity:.3}}
-/* メトロノーム。拍ごとにSVGを組み直すので、片道ぶんのアニメーションが毎拍やり直される。 */
-svg.wheel .metroArm{transform:rotate(0deg)}
-svg.wheel .metroArm.l{animation:metroL linear forwards}
-svg.wheel .metroArm.r{animation:metroR linear forwards}
-@keyframes metroL{from{transform:rotate(27deg)}to{transform:rotate(-27deg)}}
-@keyframes metroR{from{transform:rotate(-27deg)}to{transform:rotate(27deg)}}
-svg.wheel .metroDot{animation:metroPulse .3s ease-out forwards}
-@keyframes metroPulse{from{opacity:1}to{opacity:.15}}
+/* メトロノームの角度はCSSアニメーションではなく音の時計から毎フレーム計算する。
+   ホイールは音を弾くたびにも組み直されるので、アニメーションだと再描画のたびに
+   頭から始まってしまい、振り子が跳ね戻る。 */
 @media (prefers-reduced-motion:reduce){*{transition:none!important}
   svg.wheel .nowcell,svg.wheel .nextcell{animation:none}
-  svg.wheel .metroArm.l{transform:rotate(-27deg);animation:none}
-  svg.wheel .metroArm.r{transform:rotate(27deg);animation:none}
-  svg.wheel .metroDot{animation:none}
   svg.wheel .nextcell{opacity:.65}}
 </style>
 </head>
@@ -895,25 +887,52 @@ function cellText(x,y,am,lines){
    目でも拍が取れるように、ホイールの右下の余白で振り子を振る。
    ホイールは拍ごとに組み直されるので、そのたびにCSSアニメーションが最初から始まる。
    拍の裏表で振る向きを入れ替えると、1拍ぶんの片道がちょうど1周期になる。 */
+/* 振り子の角度。片道が1拍。両端で速度が0になるので実物の振り子のように見える。
+   拍ごとに向き(dir)が入れ替わり、前の拍の終わりと次の拍の始まりの角度が一致する。 */
+const METRO_A=27;
+const metroAngle=(p,dir,first)=>{
+  const q=Math.max(0,Math.min(1,p));
+  /* 最初の1拍だけは真上から片側へ。いきなり端に飛ばないようにする。
+     終わりの角度は通常の式と同じなので、2拍目以降とつながる。 */
+  return first ? dir*METRO_A*Math.sin(Math.PI*q/2)
+               : -dir*METRO_A*Math.cos(Math.PI*q);
+};
+let metroPivot=null, metroBeatT=0, metroDir=1, metroStarted=false, metroBeatN=0;
+
+/* 毎フレーム、音の時計から角度を引き直す。描き直しとは独立しているので、
+   コードを弾いて再描画が入っても振り子は跳ねない。 */
+function metroTick(){
+  const g=document.getElementById('metroArm');
+  if(!g||!metroPivot) return;
+  let a=0, o=0;
+  if(state.playing&&actx&&metroStarted){
+    const spb=60/state.bpm;
+    const p=(actx.currentTime-outLat()-metroBeatT)/spb;
+    a=metroAngle(p,metroDir,metroBeatN<=1);
+    o=Math.max(0,1-Math.max(0,p)*3.2);          /* 強拍の点の減衰 */
+  }
+  g.setAttribute('transform',`rotate(${a.toFixed(2)} ${f2(metroPivot.x)} ${f2(metroPivot.y)})`);
+  const d=document.getElementById('metroDot');
+  if(d) d.setAttribute('opacity',o.toFixed(3));
+}
+
 function metronome(c,W,K,T){
-  if(state.practice!=='tempo') return '';  /* 「弾いて進む」には拍が無いので出さない */
+  if(state.practice!=='tempo'){ metroPivot=null; return ''; }  /* 「弾いて進む」には拍が無い */
   const px=c+0.74*W, py=c+0.84*W;        /* 支点。円の外側の余白に置く */
   const L=52*K;
+  metroPivot={x:px,y:py};
   const on=state.playing, lv=on?(state.beatLevel|0):0;
   const bob=on?[T.node,T.brass,T.brass][lv]:T.node;
   const rod=on?T.brass:T.node;
-  const dir=mod(state.tick|0,2)?1:-1;     /* 拍ごとに向きを入れ替える */
-  const spb=(60/state.bpm).toFixed(3);
   const base=`<path d="M${f2(px-17*K)},${f2(py)} L${f2(px+17*K)},${f2(py)} `+
              `L${f2(px+10*K)},${f2(py-11*K)} L${f2(px-10*K)},${f2(py-11*K)} Z" `+
              `fill="${T.center}" stroke="${on?T.brass:T.div}" stroke-width="${(1.2*K).toFixed(2)}"/>`;
-  const arm=`<g class="metroArm${on?(dir>0?' r':' l'):''}" `+
-            `style="transform-origin:${f2(px)}px ${f2(py)}px;animation-duration:${spb}s">`+
+  const arm=`<g id="metroArm" class="metroArm">`+
             `<line x1="${f2(px)}" y1="${f2(py)}" x2="${f2(px)}" y2="${f2(py-L)}" `+
             `stroke="${rod}" stroke-width="${(2.4*K).toFixed(2)}" stroke-linecap="round"/>`+
             `<rect x="${f2(px-6*K)}" y="${f2(py-L*0.62)}" width="${f2(12*K)}" height="${f2(8*K)}" `+
             `rx="${(1.5*K).toFixed(2)}" fill="${bob}"/></g>`;
-  const dot=on&&lv?`<circle class="metroDot" cx="${f2(px)}" cy="${f2(py+10*K)}" r="${(4*K).toFixed(2)}" fill="${T.brass}"/>`:'';
+  const dot=on&&lv?`<circle id="metroDot" cx="${f2(px)}" cy="${f2(py+10*K)}" r="${(4*K).toFixed(2)}" fill="${T.brass}" opacity="0"/>`:'';
   const cd=on&&state.countdown
     ? `<text class="mono" x="${f2(px)}" y="${f2(py-L-6*K)}" text-anchor="middle" `+
       `font-size="${(15*K).toFixed(1)}" fill="${T.brass}">${state.countdown}</text>` : '';
@@ -1028,6 +1047,7 @@ function drawWheel(){
   s+=metronome(c,W,K,T);
   s+=`</svg>`;
   document.getElementById('wheel').innerHTML=s;
+  metroTick();
 
   document.querySelectorAll('svg.wheel .hit').forEach(el=>{
     const go=()=>{state.startFifth=+el.dataset.key;state.step=0;buildSequence();afterAdvance();render();};
@@ -1233,6 +1253,7 @@ function uiLoop(){
   while(uiQ.length && uiQ[0].t+lat <= actx.currentTime){
     const e=uiQ.shift();
     state.tick=e.tick; state.beatLevel=e.lv;
+    metroBeatT=e.t; metroDir=mod(e.tick|0,2)?1:-1; metroStarted=true; metroBeatN++;
     if(e.count){ state.countdown=e.count; state.playChord=null; }
     else{
       const moved=(e.adv||state.playChord!==e.ci);
@@ -1245,6 +1266,7 @@ function uiLoop(){
     dirty=true;
   }
   if(dirty) render();
+  metroTick();
   requestAnimationFrame(uiLoop);
 }
 /* Safari(WebKit)向けの注意点が3つある。
@@ -1265,7 +1287,7 @@ let playGen=0;
 function play(){
   ensureCtx();
   const gen=++playGen;
-  state.playing=true; beat=-state.countIn; uiQ=[];
+  state.playing=true; beat=-state.countIn; uiQ=[]; metroStarted=false; metroBeatN=0;
   state.countdown=state.countIn; state.playChord=state.countIn?null:0;
   render();
   let started=false;
@@ -1288,7 +1310,7 @@ function play(){
 }
 function stop(){
   playGen++;
-  state.playing=false; clearInterval(schedId); schedId=null; uiQ=[];
+  state.playing=false; metroStarted=false; clearInterval(schedId); schedId=null; uiQ=[];
   state.playChord=null; state.countdown=0; render();
 }
 const toggledPlay=()=>{ if(state.practice!=='tempo') return; state.playing?stop():play(); };
@@ -1405,7 +1427,7 @@ document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
 window.__dbg={state,held,target,judge,curTarget,render,renderLight,advanceMidi,afterAdvance,
   clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,setPractice,
-  buildSequence,drawJudge,
+  buildSequence,drawJudge,metroAngle,metroTick,
   play:()=>play(), stop:()=>stop(),
   reset(){held.clear();clearBad();settleUntil=0;needReplay=false;render();}};
 
