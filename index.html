@@ -158,8 +158,10 @@
     <div class="row">
       <label style="color:var(--dim);font-size:13px">ミスを赤くするまでの猶予
         <input type="number" id="grace" value="60" min="0" max="500" step="10" style="width:5.5em;margin-left:6px"> ms</label>
+      <label style="color:var(--dim);font-size:13px">正解のあと判定を再開するまで
+        <input type="number" id="settle" value="300" min="0" max="2000" step="50" style="width:5.5em;margin-left:6px"> ms</label>
     </div>
-    <div class="note-s">和音は同時に押せないので、コードの移り変わりを誤検出しないための待ち時間。正解の判定には猶予は使いません（そろった瞬間に正解）。</div>
+    <div class="note-s">和音は同時に押せないので、コードの移り変わりを誤検出しないための待ち時間です。<b>正解の判定には使いません</b>（そろった瞬間に正解）。そのぶん、正解のあとに遅れて届いた指（オクターブの重ね、押しムラ）が次のコードの「余分な音」に見えるので、その分を待ちます。赤が出やすければ増やしてください。</div>
 
     <h2 style="margin-top:14px">その他</h2>
     <div class="row">
@@ -311,7 +313,8 @@ const state={
   keyFifth:0, keyPat:'P4u',
   pos:0, cycles:0, cleared:0,
   notation:'std', showDeg:true, hint:false,
-  graceMs:60, bassRule:'root',      /* 'root' = ルートを最低音に / 'any' = 転回形を許す */
+  graceMs:60, settleMs:300,         /* settleMs = 正解のあと、ミスの判定を再開するまで */
+  bassRule:'root',                  /* 'root' = ルートを最低音に / 'any' = 転回形を許す */
 };
 const BASSRULES=[
   {id:'root', name:'ルートを最低音に'},
@@ -331,7 +334,7 @@ const fifthOfPc=pc=>keyOrder().find(kf=>pcOf(kf)===pc);
 
 /* 押している音（MIDIノート番号 → true）。集合で持つので重複ポートは自然に吸収される。 */
 const held=new Set();
-let badTimer=null, showBad=false;
+let badTimer=null, showBad=false, settleUntil=0;
 
 /* ===================== 目標コードの展開 ===================== */
 function target(){
@@ -381,8 +384,11 @@ function advance(){
     }
   }
   clearBad();
+  /* 正解の判定は「そろった瞬間」なので、そのあとに遅れて届く指（オクターブの重ね、
+     和音の押しムラ）が次のコードの「余分な音」に見えてしまう。その分だけ待つ。 */
+  settleUntil=performance.now()+Math.max(0,state.settleMs);
 }
-function restart(){ state.pos=0; state.cycles=0; state.cleared=0; clearBad(); render(); }
+function restart(){ state.pos=0; state.cycles=0; state.cleared=0; clearBad(); settleUntil=0; render(); }
 function clearBad(){ if(badTimer){clearTimeout(badTimer);badTimer=null;} showBad=false; }
 /* 最低音の違反は、必要な音がそろってから言う。組み立ての途中（3rdを先に押した等）で
    「最低音が違う」と出すのは早すぎるため。余分な音はいつでも間違い。 */
@@ -408,7 +414,7 @@ function onNote(num,on){
   const wasBad=showBad;
   clearBad();
   if(isBad(r)){
-    if(on){
+    if(on&&performance.now()>=settleUntil){
       showBad=wasBad;      /* すでに赤いなら、猶予の間だけ消えて点滅するのを防ぐ */
       badTimer=setTimeout(()=>{
         badTimer=null;
@@ -598,6 +604,7 @@ $('btnHint').onclick=()=>{ state.hint=!state.hint; renderSettings(); render(); }
 $('btnNotation').onclick=()=>{ state.notation=state.notation==='jazz'?'std':'jazz'; renderSettings(); render(); };
 $('btnDegree').onclick=()=>{ state.showDeg=!state.showDeg; renderSettings(); render(); };
 $('grace').oninput=e=>{ state.graceMs=Math.max(0,Math.min(500,+e.target.value||0)); };
+$('settle').oninput=e=>{ state.settleMs=Math.max(0,Math.min(2000,+e.target.value||0)); };
 $('tabs').onclick=e=>{ const b=e.target.closest('[data-tab]'); if(!b)return;
   state.presetTab=+b.dataset.tab; state.presetIdx=0; restart(); renderSettings(); };
 $('plist').onclick=e=>{ const b=e.target.closest('[data-item]'); if(!b)return;
@@ -609,7 +616,8 @@ $('bassRule').onclick=e=>{ const b=e.target.closest('[data-br]'); if(!b)return;
 
 /* テスト用：実機と同じ経路に偽MIDIを流す */
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
-window.__dbg={state,held,target,judge,render,advance,nn,pcOf,chordFifth,bassFifthOf,PRESETS};
+window.__dbg={state,held,target,judge,render,advance,nn,pcOf,chordFifth,bassFifthOf,PRESETS,
+  reset(){ held.clear(); clearBad(); settleUntil=0; goodUntil=0; render(); }};
 
 if(!navigator.requestMIDIAccess){
   setStatus('このブラウザは Web MIDI API に非対応です（iPadでは MIDIWeb Browser、Macでは Chrome）','ng');
