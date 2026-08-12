@@ -133,11 +133,16 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .judge .msg.ok{color:var(--brass)}
 .judge .msg.ng{color:var(--felt-lit)}
 .judge .marks{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim)}
+.judge button.sm{padding:3px 8px;font-size:11.5px;line-height:1.3;min-height:0}
+@media (pointer:coarse){.judge button.sm{padding:7px 12px;font-size:12.5px}}
+/* 接続先の名前は長くなりうる。行を押し広げて「編集を開く」を追い出さないよう幅を切る。 */
 #midiState{font-family:var(--f-mono);font-size:11px;color:var(--ivory-dim);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(38ch,40vw)}
 #midiState.ok{color:var(--brass)}
 #midiState.ng{color:var(--felt-lit)}
 button.midi{min-width:44px}
+button:disabled{opacity:.45;cursor:default}
+button:disabled:hover{background:var(--lacquer-3)}
 input[type=number]{font-family:inherit;font-size:13px;color:var(--ivory);background:var(--lacquer-3);
   border:1px solid var(--line);border-radius:6px;padding:6px 8px}
 svg.wheel{display:block;width:100%;height:auto}
@@ -173,7 +178,8 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
   <header class="top">
     <span class="eyebrow">midi practice wheel</span>
     <h1>コード弾き練習</h1>
-    <span class="sub">外側から内側へ弾く／内側が着地</span>
+    <button id="midiBtn" class="midi">MIDIに接続</button>
+    <span id="midiState">未接続</span>
     <button id="advBtn" class="ghost advtoggle">編集を開く</button>
   </header>
 
@@ -259,6 +265,12 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
           <input type="number" id="settle" value="300" min="0" max="2000" step="50" style="width:5.2em">
           <span class="hint" style="margin:0">ms</span>
         </div>
+        <div class="row" style="margin-top:6px;align-items:center;gap:8px">
+          <span class="hint" style="margin:0">テンポ：拍より早く押さえてもよい幅</span>
+          <input type="number" id="early" value="300" min="0" max="2000" step="50" style="width:5.2em">
+          <span class="hint" style="margin:0">ms</span>
+        </div>
+        <p class="hint">人は拍の頭ぴったりには押さず少し先回りするので、拍が変わった時点ですでに正しく押さえていれば、その直前の打鍵ぶんは拾います（ずっと押しっぱなしのものは拾いません）。</p>
         <p class="hint">和音は同時に押せないので、コードの移り変わりを誤検出しないための待ち時間です。<b>正解の判定には使いません</b>（そろった瞬間に正解）。そのぶん、正解のあとに遅れて届いた指が次のコードの余分な音に見えるので、その分を待ちます。</p>
         <p class="hint"><a href="monitor.html">MIDIモニタ</a>（機材が何を送っているか調べる画面）</p>
       </div>
@@ -311,6 +323,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <div class="judge">
           <span class="msg" id="judgeMsg">&nbsp;</span>
           <span class="marks" id="marks"></span>
+          <button id="clearMarksBtn2" class="ghost sm">印を消す</button>
         </div>
 
         <div class="wheelfoot">
@@ -321,7 +334,6 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
           <span class="seg" id="modeSeg2" aria-label="進み方">
             <button data-m="midi">弾いて進む</button><button data-m="tempo">テンポ</button>
           </span>
-          <button id="midiBtn" class="midi">MIDIに接続</button>
           <span id="tempoOnly" style="display:contents">
             <input type="range" id="bpm" min="40" max="208" step="1" value="96" aria-label="テンポ">
             <button id="bpmDown" class="step" aria-label="テンポを1下げる">−</button>
@@ -333,7 +345,6 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
             <button id="playBtn2" class="play" aria-label="再生／停止">▶</button>
           </span>
         </div>
-        <div id="midiState" style="padding:0 4px 2px">未接続</div>
       </div>
       <div class="legend">
         <span><span class="swatch" style="background:rgba(164,36,59,.85)"></span><b>いちばん内側</b>＝着地するコード</span>
@@ -535,13 +546,16 @@ const state={
   seq:[], shifts:new Set(), closed:true,
   /* ===== MIDI版で足した状態 ===== */
   practice:'midi',        /* 'midi' = 弾いたら進む / 'tempo' = 拍で進む */
-  bassRule:'root', graceMs:60, settleMs:300, showNotes:false,
+  bassRule:'root', graceMs:60, settleMs:300, earlyMs:300, showNotes:false,
   marks:new Set()         /* 押せたセル。'調のピッチクラス|進行内の位置' */
 };
 
 /* 押している音（MIDIノート番号）。集合なので、複数ポートが同じ信号をミラーしても吸収される */
 const held=new Set();
 let midi=null, badTimer=null, showBad=false, settleUntil=0, needReplay=false;
+/* 直近の打鍵の時刻と、その打鍵がすでに印を得たかどうか。
+   1回の打鍵で2つの区画に印を付けないための札（下の afterAdvance を参照）。 */
+let lastNoteOnAt=-1e9, noteOnUsed=false;
 
 const keyOrder=()=>[0,1,2,3,4,5,(state.triSharp?6:-6),-5,-4,-3,-2,-1];
 const pat=()=>PATTERNS.find(p=>p.id===state.patId);
@@ -659,10 +673,23 @@ function clearBad(){ if(badTimer){clearTimeout(badTimer);badTimer=null;} showBad
 
 /* 進んだ先を、すでに押している音がそのまま満たしている場合（同じコードが連続する進行）。
    弾き直すまで正解にしない。さもないと押したままオクターブを足すだけで正解が積み上がる。 */
-function afterAdvance(){
+/* fromTempo: 拍でセルが移ったとき。
+   人は拍の頭ぴったりには押さず、少し先回りして押さえる。そのまま「弾き直すまで正解に
+   しない」を適用すると、直前に押さえていた正しい和音がまるごと無視される。
+   移った瞬間にすでに正しく押されていて、それが直前の打鍵によるものなら拾う。
+   ずっと前から押しっぱなしのものは（弾いた行為ではないので）拾わない。 */
+function afterAdvance(fromTempo){
   clearBad();
-  settleUntil=performance.now()+Math.max(0,state.settleMs);
-  needReplay=judge(curTarget()).ok;
+  const now=performance.now();
+  settleUntil=now+Math.max(0,state.settleMs);
+  const r=judge(curTarget());
+  /* ★ その打鍵がすでに印を得ていたら拾わない。同じコードが連続する進行（ブルースの
+     折り返し）で、自分の拍で正解した打鍵を、折り返した先の同じコードでもう一度
+     拾ってしまい、1回の打鍵で2つ印が付く。 */
+  if(r.ok&&fromTempo&&isLive()&&!noteOnUsed&&now-lastNoteOnAt<=Math.max(0,state.earlyMs)){
+    state.marks.add(markOf(curFifth(),activeCi())); noteOnUsed=true;
+  }
+  needReplay=r.ok;
 }
 function advanceMidi(){
   state.playChord=mod(activeCi()+1,state.chords.length);
@@ -674,7 +701,7 @@ function clearMarks(){ state.marks=new Set(); }
 
 /* ===== MIDI 受信 ===== */
 function onNote(num,on){
-  if(on){ held.add(num); } else held.delete(num);
+  if(on){ held.add(num); lastNoteOnAt=performance.now(); noteOnUsed=false; } else held.delete(num);
   const t=curTarget(), r=judge(t);
 
   if(r.ok){
@@ -682,7 +709,7 @@ function onNote(num,on){
     /* 印を付けるのは、いま弾くべき区画が画面に出ているときだけ。テンポで停止中や
        カウントイン中は現在地が無いので、見えない的に当てて印が付くのはおかしい。 */
     if(!isLive()){ renderLight(); return; }
-    state.marks.add(markOf(t.kf,activeCi()));
+    state.marks.add(markOf(t.kf,activeCi())); noteOnUsed=true;
     if(state.practice==='midi'){ advanceMidi(); renderAll(); return; }
     needReplay=true;                                /* テンポ中は進めない。印だけ付ける */
     renderAll(); return;
@@ -1092,6 +1119,7 @@ function drawPanel(){
   document.getElementById('hintBtn').classList.toggle('on',state.showNotes);
   document.getElementById('grace').value=state.graceMs;
   document.getElementById('settle').value=state.settleMs;
+  document.getElementById('early').value=state.earlyMs;
   /* テンポでしか使わない操作は「弾いて進む」では隠す。押せてしまうと意味が通らない。 */
   document.getElementById('tempoOnly').style.display=state.practice==='tempo'?'contents':'none';
 }
@@ -1146,7 +1174,7 @@ function uiLoop(){
       state.countdown=0; state.playChord=e.ci;
       /* テンポでもセルが移ったら、猶予と「弾き直し要求」を引き直す。
          そうしないと、拍で進んだ直後の遅れた指や持ち越しが同じ問題を起こす。 */
-      if(moved) afterAdvance();
+      if(moved) afterAdvance(true);
     }
     dirty=true;
   }
@@ -1254,7 +1282,7 @@ function setPractice(m){
 const SAVE_KEY='chord_practice_midi.v2';
 const SAVE_FIELDS=['practice','bassRule','graceMs','settleMs','showNotes',
   'theme','notation','showDeg','simplifyAcc','showPath','advanced',
-  'bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
+  'earlyMs','bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
   'mode','startFifth','presetTab','chords'];
 let saveT=null;
 function save(){
@@ -1280,6 +1308,7 @@ function loadSaved(){
   state.bassRule   =pick(o.bassRule,BASSRULES.map(b=>b.id),'root');
   state.graceMs    =num(o.graceMs,0,500,60);
   state.settleMs   =num(o.settleMs,0,2000,300);
+  state.earlyMs    =num(o.earlyMs,0,2000,300);
   state.theme      =pick(o.theme,['dark','light'],state.theme);
   state.notation   =pick(o.notation,['std','jazz'],'std');
   state.patId      =pick(o.patId,PATTERNS.map(p=>p.id),'P4u');
@@ -1299,9 +1328,11 @@ function loadSaved(){
 /* ===== MIDI版で足した操作の配線 ===== */
 document.getElementById('midiBtn').onclick=connectMidi;
 document.getElementById('hintBtn').onclick=()=>{state.showNotes=!state.showNotes;render();};
-document.getElementById('clearMarksBtn').onclick=()=>{clearMarks();render();};
+document.querySelectorAll('#clearMarksBtn,#clearMarksBtn2').forEach(b=>
+  b.onclick=()=>{clearMarks();render();});
 document.getElementById('grace').oninput=e=>{state.graceMs=Math.max(0,Math.min(500,+e.target.value||0));saveSoon();};
 document.getElementById('settle').oninput=e=>{state.settleMs=Math.max(0,Math.min(2000,+e.target.value||0));saveSoon();};
+document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2000,+e.target.value||0));saveSoon();};
 
 /* テスト用：実機と同じ処理経路に偽のMIDIを流す */
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
