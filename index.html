@@ -99,26 +99,29 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 .wheelbox{background:var(--lacquer-2);border:1px solid var(--line);border-radius:14px;padding:10px}
 /* 再生とリセットは五度圏の右上の余白へ。下の行にあると指が届きにくい。
    円の外側なので、ホイールの絵には重ならない。 */
+.presetblock{margin-top:14px}
+.presetblock .tools{align-items:center;gap:10px}
 .wheelwrap{position:relative}
 .wheelbtns{position:absolute;right:1.5%;top:2.5%;display:flex;flex-direction:column;
   align-items:center;gap:8px}
-.wheelbtns .ghost{font-size:12px;padding:5px 9px}
+.wheelbtns .ghost{font-size:14px;padding:9px 15px}
+@media (pointer:coarse){.wheelbtns .ghost{font-size:15px;padding:12px 18px}}
 /* 画面が狭いと円と余白の差が詰まり、重ねると絵を隠す。そこはホイールの上に並べる。 */
 @media (max-width:600px){
   .wheelbtns{position:static;flex-direction:row;justify-content:flex-end;
     align-items:center;gap:10px;margin:0 2px 6px}
 }
 .donewrap{display:inline-flex;align-items:center;gap:7px;margin-left:6px}
+/* スライダーと ± は一続きで意味を成す。折り返すならこの塊ごと折り返す。 */
+.bpmgroup{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  flex:1 1 250px;min-width:210px}
+.bpmgroup input[type=range]{flex:1 1 90px;min-width:70px;margin:0}
 .wheelhead{display:flex;align-items:center;gap:12px;padding:8px 4px 10px;
   border-bottom:1px solid var(--line);margin-bottom:6px}
 .wheelfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   padding:12px 4px 4px;border-top:1px solid var(--line);margin-top:8px}
-/* 中身が変わる表示にはそれぞれ固定幅を与える。ここが伸び縮みすると、余りを受け持つ
-   スライダーの長さまで動いてしまい、行全体が落ち着かない。幅は最長の文字列
-   （B♭m → E♭m／12 / 12／208 BPM）に合わせてある。 */
-.wheelfoot .keynow{font-family:var(--f-display);font-size:17px;white-space:nowrap;
-  flex:none;width:126px;text-align:center}
-.wheelfoot .keynow b{color:var(--brass);font-weight:600}
+/* 中身が変わる表示には固定幅を与える。ここが伸び縮みすると、余りを受け持つ
+   スライダーの長さまで動いてしまい、行全体が落ち着かない。 */
 .wheelfoot input[type=range]{flex:1 1 110px;min-width:80px;margin:0}
 .wheelfoot > button{min-width:44px;font-size:16px;line-height:1.2}
 .wheelfoot > button.step{min-width:30px;padding:6px 0;font-size:15px;flex:none}
@@ -169,8 +172,10 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .hintrow .nc.opt{border-style:dashed}
 .hintrow .nc.bass{outline:2px solid var(--brass);outline-offset:1px}
 /* 接続先の名前は最後まで読めること。長ければ切らずに折り返す。 */
-#midiState{font-family:var(--f-mono);font-size:11px;color:var(--ivory-dim);
-  white-space:normal;overflow-wrap:anywhere;flex:1 1 16ch;min-width:0}
+/* 接続先の名前は長い。ヘッダの隙間に押し込むと何行にも折れて場所を食うので、
+   独立した1行として下に置く。 */
+#midiState{font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim);
+  white-space:normal;overflow-wrap:anywhere;flex:1 0 100%;margin:-8px 0 -4px}
 h1 .ver{font-family:var(--f-mono);font-size:15px;color:var(--brass);letter-spacing:.02em}
 #midiState.ok{color:var(--brass)}
 #midiState.ng{color:var(--felt-lit)}
@@ -218,18 +223,10 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
     <h1>コード弾き練習 <span class="ver">MIDI Ver.</span></h1>
     <button id="midiBtn" class="midi">MIDIに接続</button>
     <span id="midiState">未接続</span>
-    <button id="advBtn" class="ghost advtoggle">編集を開く</button>
   </header>
 
   <div class="layout" id="layout">
     <div class="panel">
-      <div class="block">
-        <h2>プリセット</h2>
-        <div class="row" id="presetTabs"></div>
-        <p class="hint" id="presetNote"></p>
-        <div class="row" id="presetRow" style="margin-top:8px"></div>
-      </div>
-
       <div class="block">
         <h2>進行（弾く順）</h2>
         <div class="chips" id="chips"></div>
@@ -372,18 +369,17 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <div class="hintrow" id="noteRow"></div>
 
         <div class="wheelfoot">
-          <button id="prevBtn" aria-label="前の調">←</button>
-          <button id="nextBtn" aria-label="次の調">→</button>
-          <span class="keynow"><b id="nowKey">C</b> → <span id="nextKey">F</span></span>
           <span class="counter" id="counter">1 / 12</span>
           <span class="seg" id="modeSeg2" aria-label="進み方">
             <button data-m="midi">弾いて進む</button><button data-m="tempo">テンポ</button>
           </span>
           <span id="tempoOnly" style="display:contents">
-            <input type="range" id="bpm" min="40" max="208" step="1" value="96" aria-label="テンポ">
-            <button id="bpmDown" class="step" aria-label="テンポを1下げる">−</button>
-            <span class="counter bpm" id="bpmVal2">96 BPM</span>
-            <button id="bpmUp" class="step" aria-label="テンポを1上げる">+</button>
+            <span class="bpmgroup">
+              <input type="range" id="bpm" min="40" max="208" step="1" value="96" aria-label="テンポ">
+              <button id="bpmDown" class="step" aria-label="テンポを1下げる">−</button>
+              <span class="counter bpm" id="bpmVal2">96 BPM</span>
+              <button id="bpmUp" class="step" aria-label="テンポを1上げる">+</button>
+            </span>
             <span class="seg" id="bpcSeg2" aria-label="1コードあたりの拍数">
               <button data-b="1">1拍</button><button data-b="2">2拍</button><button data-b="4">4拍</button>
             </span>
@@ -396,6 +392,17 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
           </span>
         </div>
       </div>
+      <div class="block presetblock">
+        <h2>コード進行</h2>
+        <div class="row" id="presetTabs"></div>
+        <p class="hint" id="presetNote"></p>
+        <div class="row" id="presetRow" style="margin-top:8px"></div>
+        <div class="tools" style="margin-top:12px">
+          <button id="advBtn" class="ghost">編集を開く</button>
+          <span class="hint" style="margin:0">進行の組み替え・調の巡り方・判定・拍・表示</span>
+        </div>
+      </div>
+
       <div class="legend">
         <span><span class="swatch" style="background:rgba(164,36,59,.85)"></span><b>いちばん内側</b>＝着地するコード</span>
         <span><span class="swatch" style="background:rgba(164,36,59,.22)"></span>外側ほど先に弾く</span>
@@ -1193,8 +1200,6 @@ function drawPanel(){
     document.getElementById('shiftLabel').textContent=`輪が閉じたときのずらし方（${state.shifts.size}回）`;
   }
 
-  document.getElementById('nowKey').textContent=label(cur);
-  document.getElementById('nextKey').textContent=label(nxt);
   document.getElementById('counter').textContent=`${state.step+1} / ${state.seq.length}`;
 
   const keyRow=document.getElementById('keyRow');
@@ -1428,8 +1433,6 @@ document.getElementById('bpmDown').onclick=()=>setBpm(state.bpm-1);
 document.getElementById('bpmUp').onclick=()=>setBpm(state.bpm+1);
 document.addEventListener('keydown',e=>{
   if(e.code==='Space'&&e.target===document.body){e.preventDefault();toggledPlay();}});
-document.getElementById('nextBtn').onclick=()=>step(1);
-document.getElementById('prevBtn').onclick=()=>step(-1);
 document.getElementById('resetBtn').onclick=()=>{state.step=0;afterAdvance();render();};
 document.getElementById('coverBtn').onclick=()=>{state.coverAll=!state.coverAll;state.step=0;buildSequence();render();};
 document.getElementById('addBtn').onclick=()=>{const c=state.chords[state.sel];
@@ -1520,8 +1523,12 @@ function loadSaved(){
 document.getElementById('midiBtn').onclick=connectMidi;
 document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>
   b.onclick=()=>{state.showNotes=!state.showNotes;render();});
-document.querySelectorAll('#clearMarksBtn,#clearMarksBtn2').forEach(b=>
-  b.onclick=()=>{clearMarks();render();});
+document.querySelectorAll('#clearMarksBtn,#clearMarksBtn2').forEach(b=>b.onclick=()=>{
+  clearMarks();
+  /* 進行の途中（内側の輪）まで来ていたら、そこも最初へ戻す。
+     テンポ中の位置は拍が決めるので触らない。 */
+  if(state.practice==='midi') state.playChord=0;
+  afterAdvance(); render();});
 document.getElementById('grace').oninput=e=>{state.graceMs=Math.max(0,Math.min(500,+e.target.value||0));saveSoon();};
 document.getElementById('settle').oninput=e=>{state.settleMs=Math.max(0,Math.min(2000,+e.target.value||0));saveSoon();};
 document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2000,+e.target.value||0));saveSoon();};
