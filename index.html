@@ -6,457 +6,592 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="MIDIモニタ">
-<meta name="theme-color" content="#12141a">
-<title>MIDIモニタ — コード練習(MIDI版) 骨格</title>
+<meta name="apple-mobile-web-app-title" content="コード練習">
+<meta name="theme-color" content="#14110f">
+<title>コード弾き練習（MIDI）</title>
 <style>
   :root{
-    --bg:#12141a; --panel:#1a1d26; --panel2:#232733; --line:#2f3444;
-    --fg:#e6e9f0; --dim:#8b93a7; --accent:#5cc8ff; --ok:#5ddba0; --warn:#ffcc66; --ng:#ff7b7b;
+    --bg:#14110f; --panel:#1d1a17; --panel2:#262220; --line:#3a3430;
+    --fg:#efe7d8; --dim:#9c9483; --brass:#c9a227;
+    --ok:#5ddba0; --ng:#e2645f; --info:#6fb6e8;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  html,body{margin:0;padding:0;height:100%}
   body{
     background:var(--bg); color:var(--fg);
     font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
-    font-size:15px; line-height:1.5;
+    font-size:15px; line-height:1.5; -webkit-text-size-adjust:100%;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
-  .wrap{max-width:980px;margin:0 auto;padding:12px 12px 40px}
-  h1{font-size:17px;margin:4px 0 10px;font-weight:600}
-  h1 .sub{font-size:12px;color:var(--dim);font-weight:400;margin-left:8px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
-  .panel h2{font-size:13px;margin:0 0 8px;color:var(--dim);font-weight:600;letter-spacing:.04em}
-  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  button{
-    background:var(--panel2);color:var(--fg);border:1px solid var(--line);
-    border-radius:8px;padding:9px 14px;font-size:14px;font-family:inherit;cursor:pointer;
-    min-height:40px;
+  .wrap{max-width:760px;margin:0 auto;padding:10px 12px 32px}
+
+  /* ---- 上段 ---- */
+  .top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+    color:var(--dim);font-size:13px;min-height:26px}
+  .top .key{color:var(--fg);font-size:19px;font-weight:600;
+    min-width:3.4em;font-variant-numeric:tabular-nums}
+  .top .sp{margin-left:auto}
+
+  /* ---- コード表示 ---- */
+  .stage{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:18px 16px 14px;margin:8px 0 10px;text-align:center;
+    transition:background .12s, border-color .12s;
   }
-  button:active{background:#2c3140}
-  button.primary{background:var(--accent);color:#06202c;border-color:var(--accent);font-weight:600}
+  .stage.good{background:#1b2c22;border-color:#3d6b52}
+  .stage.bad{background:#2c1c1b;border-color:#6b3a38}
+  .chord{
+    font-size:clamp(44px,13vw,76px);line-height:1.1;font-weight:600;letter-spacing:.01em;
+    min-height:1.15em;
+  }
+  .chord .b{font-size:.52em;font-weight:400;color:var(--dim)}
+  .deg{font-size:14px;color:var(--dim);font-family:ui-monospace,Menlo,monospace;min-height:1.4em}
+  .next{font-size:14px;color:var(--dim);margin-top:6px;min-height:1.4em}
+  .next b{color:#b9ad97;font-weight:600}
+
+  /* ---- 状態行 ---- */
+  .msg{text-align:center;font-size:15px;min-height:1.6em;margin:2px 0 8px}
+  .msg.ok{color:var(--ok)} .msg.ng{color:var(--ng)} .msg.dim{color:var(--dim)}
+
+  /* ---- 鍵盤 ---- */
+  .kbwrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px}
+  svg.kb{display:block;width:100%;height:auto}
+
+  /* ---- チップ ---- */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;min-height:32px;align-items:center}
+  .chip{border-radius:6px;padding:4px 9px;font-size:14px;
+    font-family:ui-monospace,Menlo,monospace;border:1px solid}
+  .chip.need{background:#22262e;border-color:#3d4756;color:#a8b4c6}
+  .chip.opt{background:#22262e;border-color:#3d4756;color:#6f7b8c;border-style:dashed}
+  .chip.got{background:#20404f;border-color:#3f7794;color:#bfe6ff}
+  .chip.bad{background:#402020;border-color:#7d3c3a;color:#ffc4c2}
+  .chip.bass{outline:2px solid var(--brass);outline-offset:1px}
+  .chip.bassng{outline:2px dashed #7d6b5c;outline-offset:1px}
+  .lbl{font-size:11px;color:var(--dim);text-align:center;margin:8px 0 3px}
+
+  /* ---- パネル・操作 ---- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+  .panel h2{font-size:12px;margin:0 0 8px;color:var(--dim);font-weight:600;letter-spacing:.05em}
+  .row{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+  button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;
+    padding:8px 13px;font-size:14px;font-family:inherit;cursor:pointer;min-height:38px}
+  button:active{background:#332d29}
+  button.on{background:var(--brass);border-color:var(--brass);color:#241d05;font-weight:600}
+  button.primary{background:var(--brass);border-color:var(--brass);color:#241d05;font-weight:600}
   button:disabled{opacity:.45;cursor:default}
-  label.chk{display:inline-flex;align-items:center;gap:6px;color:var(--dim);font-size:13px;cursor:pointer;min-height:40px}
-  input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
-
-  #status{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
-  #status.ok{color:var(--ok);border-color:#2b5a45}
-  #status.ng{color:var(--ng);border-color:#5a2b2b}
-  #status.warn{color:var(--warn);border-color:#5a4c2b}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-  .cell{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
-  .cell .k{font-size:11px;color:var(--dim)}
-  .cell .v{font-size:15px;margin-top:2px;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
-  .v.big{font-size:20px}
-
-  .notes{display:flex;flex-wrap:wrap;gap:6px;min-height:44px;align-items:center}
-  .note{
-    background:#243b4d;border:1px solid #37617d;color:#bfe6ff;border-radius:6px;
-    padding:5px 9px;font-family:ui-monospace,Menlo,monospace;font-size:14px;
-  }
-  .note.low{background:#2c4a34;border-color:#43714f;color:#c8f0d4}
-  .note.sus{background:#4a3f24;border-color:#7a6738;color:#f0e0bf}
-  .none{color:var(--dim);font-size:13px}
-
-  .pedal{display:inline-block;padding:4px 10px;border-radius:6px;font-family:ui-monospace,Menlo,monospace;
-    background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
-  .pedal.on{background:#4a3f24;border-color:#7a6738;color:#ffd98a}
-
-  #log{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.45;
-    background:#0d0f14;border:1px solid var(--line);border-radius:8px;
-    height:46vh;min-height:220px;overflow-y:auto;padding:6px 8px;
-  }
-  #log div{white-space:pre;color:#c9d1e0}
-  #log .t{color:#5f6a80}
-  #log .on{color:#7ee0a8}
-  #log .off{color:#ff9a9a}
-  #log .cc{color:#ffcc66}
-  #log .sys{color:#7a8398}
-  #log .other{color:#b79dff}
-  .devlist{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#c9d1e0}
-  .devlist div{padding:2px 0}
-  .hint{font-size:12px;color:var(--dim);margin-top:8px}
-  .hint code{background:var(--panel2);padding:1px 5px;border-radius:4px}
+  button.sm{padding:5px 10px;min-height:32px;font-size:13px}
+  select,input[type=number]{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;min-height:38px}
+  .pat-btn{padding:6px 11px;min-height:34px;font-size:13px}
+  .plist{display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto;margin-top:8px}
+  .plist button{text-align:left;justify-content:flex-start;font-size:13px;padding:8px 11px;min-height:36px}
+  .note-s{font-size:12px;color:var(--dim);margin-top:6px}
+  #status{font-size:13px;padding:7px 10px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--dim)}
+  #status.ok{color:var(--ok);border-color:#2f5a45}
+  #status.ng{color:var(--ng);border-color:#5a3130}
+  details summary{cursor:pointer;color:var(--dim);font-size:13px;padding:6px 0;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:'▸ ';}
+  details[open] summary::before{content:'▾ ';}
+  a{color:var(--info)}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <h1>MIDIモニタ<span class="sub">コード練習(MIDI版) — 最小の骨格</span></h1>
-
-  <div class="panel">
-    <div class="row" style="margin-bottom:8px">
-      <button id="btnConnect" class="primary">MIDIに接続</button>
-      <button id="btnClear">クリア</button>
-      <label class="chk"><input type="checkbox" id="chkPause"> ログ停止</label>
-      <label class="chk"><input type="checkbox" id="chkRT"> システムリアルタイムも表示</label>
-    </div>
-    <div id="status">未接続 — 「MIDIに接続」を押してください</div>
-    <div class="hint" id="secWarn" hidden></div>
+  <div class="top">
+    <span class="key" id="keyName">—</span>
+    <span id="progName">—</span>
+    <span class="sp" id="counter">—</span>
   </div>
 
-  <div class="panel">
-    <h2>入力デバイス</h2>
-    <div class="devlist" id="devs"><div class="none">未接続</div></div>
+  <div class="stage" id="stage">
+    <div class="deg" id="deg">&nbsp;</div>
+    <div class="chord" id="chord">—</div>
+    <div class="next" id="next">&nbsp;</div>
   </div>
 
-  <div class="panel">
-    <h2>いま押している音（ノートオン中）</h2>
-    <div class="notes" id="held"><span class="none">なし</span></div>
-    <div class="row" style="margin-top:10px;gap:12px">
-      <span>ダンパー(CC64): <span class="pedal" id="pedal">— </span></span>
-      <span style="font-size:12px;color:var(--dim)">緑＝最低音</span>
-    </div>
-    <div style="margin-top:10px">
-      <div style="font-size:11px;color:var(--dim);margin-bottom:4px">ペダル中に離された音（ノートオフ受信済み・耳には残っている音）</div>
-      <div class="notes" id="sus"><span class="none">なし</span></div>
-    </div>
-  </div>
+  <div class="msg dim" id="msg">「MIDIに接続」を押してください</div>
 
-  <div class="panel">
-    <h2>観測サマリー（10章の確認項目）</h2>
-    <div class="grid">
-      <div class="cell"><div class="k">受信チャンネル</div><div class="v big" id="sCh">—</div></div>
-      <div class="cell"><div class="k">ノートオフの表現</div><div class="v" id="sOff">—</div></div>
-      <div class="cell"><div class="k">CC64（ダンパー）</div><div class="v" id="sCC64">—</div></div>
-      <div class="cell"><div class="k">その他のCC</div><div class="v" id="sCC">—</div></div>
-      <div class="cell"><div class="k">ベロシティ範囲</div><div class="v" id="sVel">—</div></div>
-      <div class="cell"><div class="k">ノート番号の範囲</div><div class="v" id="sRange">—</div></div>
-      <div class="cell"><div class="k">受信メッセージ種別</div><div class="v" id="sTypes">—</div></div>
-      <div class="cell"><div class="k">受信数</div><div class="v" id="sCount">0</div></div>
-    </div>
-  </div>
+  <div class="kbwrap"><svg class="kb" id="kb" viewBox="0 0 100 26" preserveAspectRatio="none"></svg></div>
 
-  <div class="panel">
-    <h2>受信ログ（新しいものが上）</h2>
-    <div id="log"></div>
+  <div id="hintBox" hidden>
+    <div class="lbl">構成音</div>
+    <div class="chips" id="hintChips"></div>
   </div>
+  <div class="lbl">押している音</div>
+  <div class="chips" id="playChips"><span style="color:var(--dim);font-size:13px">なし</span></div>
 
-  <div class="panel">
-    <h2>テスト入力（機材なしの動作確認用）</h2>
+  <div class="panel" style="margin-top:12px">
     <div class="row">
-      <button data-test="cmaj">C E G を押す</button>
-      <button data-test="cmaj-off80">↑を離す(0x80)</button>
-      <button data-test="cmaj-off90">↑を離す(0x90 vel0)</button>
-      <button data-test="ped-on">ペダル踏む</button>
-      <button data-test="ped-off">ペダル離す</button>
-      <button data-test="ch10">ch10でノートオン</button>
+      <button id="btnConnect" class="primary">MIDIに接続</button>
+      <button id="btnSkip">スキップ</button>
+      <button id="btnHint">音名ヒント</button>
+      <button id="btnRestart">最初から</button>
     </div>
-    <div class="hint">実機と同じ処理経路に偽のMIDIを流します。<code>__inject([0x90,60,80])</code> でも呼べます。</div>
+    <div id="status" style="margin-top:8px">未接続</div>
   </div>
+
+  <details class="panel">
+    <summary>練習の設定</summary>
+
+    <h2 style="margin-top:10px">コード進行</h2>
+    <div class="row" id="tabs"></div>
+    <div class="plist" id="plist"></div>
+    <div class="note-s" id="presetNote"></div>
+
+    <h2 style="margin-top:14px">キーの進み方（1周したら）</h2>
+    <div class="row" id="keyPat"></div>
+
+    <h2 style="margin-top:14px">表示</h2>
+    <div class="row">
+      <button id="btnNotation">ジャズ表記</button>
+      <button id="btnDegree" class="on">度数を表示</button>
+    </div>
+
+    <h2 style="margin-top:14px">判定</h2>
+    <div class="row">
+      <label style="color:var(--dim);font-size:13px">ミスを赤くするまでの猶予
+        <input type="number" id="grace" value="60" min="0" max="500" step="10" style="width:5.5em;margin-left:6px"> ms</label>
+    </div>
+    <div class="note-s">和音は同時に押せないので、コードの移り変わりを誤検出しないための待ち時間。正解の判定には猶予は使いません（そろった瞬間に正解）。</div>
+
+    <h2 style="margin-top:14px">その他</h2>
+    <div class="row">
+      <button class="sm" onclick="location.reload()">再読み込み</button>
+      <a class="sm" href="monitor.html" style="align-self:center">MIDIモニタ</a>
+    </div>
+  </details>
 
 </div>
 
 <script>
 'use strict';
 
-/* ---------- 基本ユーティリティ ---------- */
-const NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
-// C4 = 60（ヤマハ式ならC3。表示上の約束にすぎない）
-const noteName = n => NAMES[n % 12] + (Math.floor(n / 12) - 1);
-const hex = n => n.toString(16).toUpperCase().padStart(2, '0');
-const $ = id => document.getElementById(id);
+/* ===================== 音名：五度圏上の整数（C=0, G=1, F=-1 …） =====================
+   既存アプリ chord_practice から流用。異名同音が調ごとに正しく綴られる。 */
+const L2F={F:-1,C:0,G:1,D:2,A:3,E:4,B:5};
+const F2L=['F','C','G','D','A','E','B'];
+const mod=(n,m)=>((n%m)+m)%m;
+const noteName=n=>{const a=Math.floor((n+1)/7);
+  return F2L[mod(n+1,7)]+(a>0?'♯'.repeat(a):a<0?'♭'.repeat(-a):'');};
+const simplify=n=>{while(n>6)n-=12;while(n<-6)n+=12;return n;};
+const nn=n=>noteName(Math.abs(Math.floor((n+1)/7))>=2?simplify(n):n);
+const pcOf=n=>mod(n*7,12);                    /* 五度圏インデックス → ピッチクラス */
+const ROMAN=['I','II','III','IV','V','VI','VII'];
+const degreeLabel=rel=>{const a=Math.floor((rel+1)/7);
+  return (a>0?'♯'.repeat(a):a<0?'♭'.repeat(-a):'')+ROMAN[mod(rel*4,7)];};
 
-/* ---------- 状態 ---------- */
-const held = new Map();          // noteNumber -> {vel, ch}
-const sustained = new Set();     // ペダル中に離された音
-let pedalDown = false, pedalVal = null;
-
-const stat = {
-  count: 0,
-  channels: new Set(),
-  offReal: 0,        // 0x80 ノートオフ
-  offVel0: 0,        // 0x90 ベロシティ0
-  cc: new Map(),     // ccNum -> last value
-  cc64Values: new Set(),
-  velMin: null, velMax: null,
-  noteMin: null, noteMax: null,
-  types: new Set(),
+/* ===================== クオリティ → 構成音 =====================
+   半音ではなく「五度圏上の距離」で持つ。pcOf でピッチクラスに、noteName で綴りになる。
+     0=R  4=M3  -3=m3  1=P5  -6=♭5  8=♯5  -1=P4(sus4)  3=6th/13th  -2=m7  5=M7  2=9th
+   req = 必須 / opt = あってもなくてもよい。
+   テンションコードでは5度を任意にする（実際の弾き方に合わせる）。 */
+const Q_INT={
+  ''      :{req:[0,4,1]},        'm'    :{req:[0,-3,1]},
+  'aug'   :{req:[0,4,8]},        'sus4' :{req:[0,-1,1]},
+  '6'     :{req:[0,4,1,3]},      'm6'   :{req:[0,-3,1,3]},
+  '7'     :{req:[0,4,1,-2]},     'maj7' :{req:[0,4,1,5]},
+  'm7'    :{req:[0,-3,1,-2]},    'm7♭5' :{req:[0,-3,-6,-2]},
+  'dim7'  :{req:[0,-3,-6,3]},    'mM7'  :{req:[0,-3,1,5]},
+  '7sus4' :{req:[0,-1,1,-2]},
+  /* ↓ テンション：5度は任意 */
+  'add9'  :{req:[0,4,2],     opt:[1]},
+  '9'     :{req:[0,4,-2,2],  opt:[1]},
+  'm9'    :{req:[0,-3,-2,2], opt:[1]},
+  '13'    :{req:[0,4,-2,3],  opt:[1]},
 };
+const JAZZ_Q={'m':'-','maj7':'Δ7','m7':'-7','m7♭5':'ø7','dim7':'°7','sus4':'sus','7sus4':'7sus',
+  'm6':'-6','m9':'-9','mM7':'-Δ7','aug':'+'};
 
-let midi = null, t0 = null;
+/* ===================== プリセット（既存アプリから流用） ===================== */
+const PRESETS=[
+{tab:'1 三和音', note:'レベル1：三和音だけ。まず全調で手が動くこと。', items:[
+  {name:'IV–V–I',       mode:'major', chords:[{rel:-1,q:''},{rel:1,q:''},{rel:0,q:''}]},
+  {name:'I–IV–V–I',     mode:'major', chords:[{rel:0,q:''},{rel:-1,q:''},{rel:1,q:''},{rel:0,q:''}]},
+  {name:'IV–I–V–I',     mode:'major', chords:[{rel:-1,q:''},{rel:0,q:''},{rel:1,q:''},{rel:0,q:''}]},
+  {name:'IIm–V–I',      mode:'major', chords:[{rel:2,q:'m'},{rel:1,q:''},{rel:0,q:''}]},
+  {name:'I–VIm–IV–V',   mode:'major', chords:[{rel:0,q:''},{rel:3,q:'m'},{rel:-1,q:''},{rel:1,q:''}]},
+  {name:'I–V–VIm–IV',   mode:'major', chords:[{rel:0,q:''},{rel:1,q:''},{rel:3,q:'m'},{rel:-1,q:''}]},
+  {name:'I–IIIm–IV–V',  mode:'major', chords:[{rel:0,q:''},{rel:4,q:'m'},{rel:-1,q:''},{rel:1,q:''}]},
+  {name:'IV–V–IIIm–VIm',mode:'major', chords:[{rel:-1,q:''},{rel:1,q:''},{rel:4,q:'m'},{rel:3,q:'m'}]},
+  {name:'上行ベース I–I/III–IV–V', mode:'major',
+   chords:[{rel:0,q:''},{rel:0,q:'',bass:4},{rel:-1,q:''},{rel:1,q:''}]},
+  {name:'IV–IV/V–I',  mode:'major', chords:[{rel:-1,q:''},{rel:-1,q:'',bass:1},{rel:0,q:''}]}
+]},
+{tab:'2 四和音', note:'レベル2：ダイアトニックの四和音とツーファイブ。', items:[
+  {name:'IIm7–V7',                mode:'major', chords:[{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'IIm7–V7–Imaj7',          mode:'major', chords:[{rel:2,q:'m7'},{rel:1,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'IVmaj7–V7–Imaj7',        mode:'major', chords:[{rel:-1,q:'maj7'},{rel:1,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'Imaj7–IVmaj7',           mode:'major', chords:[{rel:0,q:'maj7'},{rel:-1,q:'maj7'}]},
+  {name:'循環 Imaj7–VIm7–IIm7–V7', mode:'major', chords:[{rel:0,q:'maj7'},{rel:3,q:'m7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'逆循環 IIIm7–VIm7–IIm7–V7',mode:'major',chords:[{rel:4,q:'m7'},{rel:3,q:'m7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'VIm7–IIm7–V7–Imaj7',     mode:'major', chords:[{rel:3,q:'m7'},{rel:2,q:'m7'},{rel:1,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'IIm7–V7sus4–V7–Imaj7',   mode:'major', chords:[{rel:2,q:'m7'},{rel:1,q:'7sus4'},{rel:1,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'IIm7–V7–Imaj7–VIm7',     mode:'major', chords:[{rel:2,q:'m7'},{rel:1,q:'7'},{rel:0,q:'maj7'},{rel:3,q:'m7'}]},
+  {name:'IIm7–IIm7/V–Imaj7', mode:'major',
+   chords:[{rel:2,q:'m7'},{rel:2,q:'m7',bass:1},{rel:0,q:'maj7'}]}
+]},
+{tab:'3 定番', note:'レベル3：日本のポップスで名前のついている型。', items:[
+  {name:'IV–V7–I',    mode:'major', chords:[{rel:-1,q:''},{rel:1,q:'7'},{rel:0,q:''}]},
+  {name:'王道 IVmaj7–V7–IIIm7–VIm7', mode:'major', chords:[{rel:-1,q:'maj7'},{rel:1,q:'7'},{rel:4,q:'m7'},{rel:3,q:'m7'}]},
+  {name:'小室 VIm–IV–V–I',           mode:'major', chords:[{rel:3,q:'m'},{rel:-1,q:''},{rel:1,q:''},{rel:0,q:''}]},
+  {name:'丸の内 IVmaj7–III7–VIm7–I7',mode:'major', chords:[{rel:-1,q:'maj7'},{rel:4,q:'7'},{rel:3,q:'m7'},{rel:0,q:'7'}]},
+  {name:'カノン I–V–VIm–IIIm–IV–I–IV–V', mode:'major', chords:[{rel:0,q:''},{rel:1,q:''},{rel:3,q:'m'},{rel:4,q:'m'},{rel:-1,q:''},{rel:0,q:''},{rel:-1,q:''},{rel:1,q:''}]},
+  {name:'ブルース I7–IV7–I7–V7–IV7–I7', mode:'major', chords:[{rel:0,q:'7'},{rel:-1,q:'7'},{rel:0,q:'7'},{rel:1,q:'7'},{rel:-1,q:'7'},{rel:0,q:'7'}]},
+  {name:'IV–V–VIm',                  mode:'major', chords:[{rel:-1,q:''},{rel:1,q:''},{rel:3,q:'m'}]},
+  {name:'IIm7–V7–IIIm7–VIm7',        mode:'major', chords:[{rel:2,q:'m7'},{rel:1,q:'7'},{rel:4,q:'m7'},{rel:3,q:'m7'}]},
+  {name:'IVmaj7–V7–VIm7',            mode:'major', chords:[{rel:-1,q:'maj7'},{rel:1,q:'7'},{rel:3,q:'m7'}]},
+  {name:'カノン下行 I–V/VII–VIm–VIm/V–IV–I/III–IIm–V', mode:'major',
+   chords:[{rel:0,q:''},{rel:1,q:'',bass:5},{rel:3,q:'m'},{rel:3,q:'m',bass:1},
+           {rel:-1,q:''},{rel:0,q:'',bass:4},{rel:2,q:'m'},{rel:1,q:''}]},
+  {name:'IV–V/IV–IIIm–VIm', mode:'major',
+   chords:[{rel:-1,q:''},{rel:1,q:'',bass:-1},{rel:4,q:'m'},{rel:3,q:'m'}]}
+]},
+{tab:'4 中級', note:'レベル4：セカンダリードミナントと経過的なディミニッシュ。', items:[
+  {name:'Imaj7–VI7–IIm7–V7',    mode:'major', chords:[{rel:0,q:'maj7'},{rel:3,q:'7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'IIIm7–VI7–IIm7–V7',    mode:'major', chords:[{rel:4,q:'m7'},{rel:3,q:'7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'Imaj7–II7–IIm7–V7',    mode:'major', chords:[{rel:0,q:'maj7'},{rel:2,q:'7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'Imaj7–I7–IVmaj7–IVm7', mode:'major', chords:[{rel:0,q:'maj7'},{rel:0,q:'7'},{rel:-1,q:'maj7'},{rel:-1,q:'m7'}]},
+  {name:'VIIm7♭5–III7–VIm7',    mode:'major', chords:[{rel:5,q:'m7♭5'},{rel:4,q:'7'},{rel:3,q:'m7'}]},
+  {name:'枯葉 IIm7–V7–Imaj7–IVmaj7–VIIm7♭5–III7–VIm7', mode:'major',
+   chords:[{rel:2,q:'m7'},{rel:1,q:'7'},{rel:0,q:'maj7'},{rel:-1,q:'maj7'},
+           {rel:5,q:'m7♭5'},{rel:4,q:'7'},{rel:3,q:'m7'}]},
+  {name:'IIIm7–VI7–IIm7–V7–Imaj7', mode:'major', chords:[{rel:4,q:'m7'},{rel:3,q:'7'},{rel:2,q:'m7'},{rel:1,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'IVmaj7–♯IVdim7–Imaj7', mode:'major', chords:[{rel:-1,q:'maj7'},{rel:6,q:'dim7'},{rel:0,q:'maj7'}]},
+  {name:'Imaj7–VI7–IIm7–V7sus4',mode:'major', chords:[{rel:0,q:'maj7'},{rel:3,q:'7'},{rel:2,q:'m7'},{rel:1,q:'7sus4'}]},
+  {name:'IVmaj7–♯IVdim7–I/V', mode:'major',
+   chords:[{rel:-1,q:'maj7'},{rel:6,q:'dim7'},{rel:0,q:'',bass:1}]}
+]},
+{tab:'5 上級', note:'レベル5：裏コードと借用和音。ルートの動きが半音になる。', items:[
+  {name:'IIm7–♭II7–Imaj7',            mode:'major', chords:[{rel:2,q:'m7'},{rel:-5,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'裏 IVm7–♭VII7–Imaj7',        mode:'major', chords:[{rel:-1,q:'m7'},{rel:-2,q:'7'},{rel:0,q:'maj7'}]},
+  {name:'IVmaj7–IVm6–Imaj7',          mode:'major', chords:[{rel:-1,q:'maj7'},{rel:-1,q:'m6'},{rel:0,q:'maj7'}]},
+  {name:'IVmaj7–IVm7–IIIm7–VI7',      mode:'major', chords:[{rel:-1,q:'maj7'},{rel:-1,q:'m7'},{rel:4,q:'m7'},{rel:3,q:'7'}]},
+  {name:'Imaj7–♭VImaj7–♭VIImaj7–Imaj7',mode:'major',chords:[{rel:0,q:'maj7'},{rel:-4,q:'maj7'},{rel:-2,q:'maj7'},{rel:0,q:'maj7'}]},
+  {name:'Imaj7–♭III7–♭VImaj7',        mode:'major', chords:[{rel:0,q:'maj7'},{rel:-3,q:'7'},{rel:-4,q:'maj7'}]},
+  {name:'IIIm7–♭IIIdim7–IIm7–V7',     mode:'major', chords:[{rel:4,q:'m7'},{rel:-3,q:'dim7'},{rel:2,q:'m7'},{rel:1,q:'7'}]},
+  {name:'IIm7–♭II7–Imaj7–♭VII7',      mode:'major', chords:[{rel:2,q:'m7'},{rel:-5,q:'7'},{rel:0,q:'maj7'},{rel:-2,q:'7'}]},
+  {name:'下行半音ベース I–I/VII–I/♭VII–IV/VI', mode:'major',
+   chords:[{rel:0,q:''},{rel:0,q:'',bass:5},{rel:0,q:'',bass:-2},{rel:-1,q:'',bass:3}]}
+]},
+{tab:'短調', note:'度数は平行短調の I を基準にとります。', items:[
+  {name:'IIm7♭5–V7–Im',        mode:'minor', chords:[{rel:2,q:'m7♭5'},{rel:1,q:'7'},{rel:0,q:'m'}]},
+  {name:'IIm7♭5–V7–Im7',       mode:'minor', chords:[{rel:2,q:'m7♭5'},{rel:1,q:'7'},{rel:0,q:'m7'}]},
+  {name:'Im–IVm–V7–Im',        mode:'minor', chords:[{rel:0,q:'m'},{rel:-1,q:'m'},{rel:1,q:'7'},{rel:0,q:'m'}]},
+  {name:'アンダルシア Im–♭VII–♭VI–V7', mode:'minor', chords:[{rel:0,q:'m'},{rel:-2,q:''},{rel:-4,q:''},{rel:1,q:'7'}]},
+  {name:'Im–♭VI–♭III–♭VII',    mode:'minor', chords:[{rel:0,q:'m'},{rel:-4,q:''},{rel:-3,q:''},{rel:-2,q:''}]},
+  {name:'Im7–♭VImaj7–♭VIImaj7–Im7', mode:'minor', chords:[{rel:0,q:'m7'},{rel:-4,q:'maj7'},{rel:-2,q:'maj7'},{rel:0,q:'m7'}]},
+  {name:'クリシェ Im–ImM7–Im7–Im6', mode:'minor', chords:[{rel:0,q:'m'},{rel:0,q:'mM7'},{rel:0,q:'m7'},{rel:0,q:'m6'}]},
+  {name:'IVm7–♭VII7–♭IIImaj7', mode:'minor', chords:[{rel:-1,q:'m7'},{rel:-2,q:'7'},{rel:-3,q:'maj7'}]},
+  {name:'Im7–IVm7–♭VIImaj7',   mode:'minor', chords:[{rel:0,q:'m7'},{rel:-1,q:'m7'},{rel:-2,q:'maj7'}]},
+  {name:'下行ベース Im–Im/♭VII–♭VI–V7', mode:'minor',
+   chords:[{rel:0,q:'m'},{rel:0,q:'m',bass:-2},{rel:-4,q:''},{rel:1,q:'7'}]}
+]}
+];
 
-/* ---------- ログ ---------- */
-const logEl = $('log');
-const pending = [];
-let flushQueued = false;
+const KEYPATS=[
+  {id:'fix',  name:'固定',   step:null},
+  {id:'P4u',  name:'4度上',  step:5},
+  {id:'P5u',  name:'5度上',  step:7},
+  {id:'m2u',  name:'半音上',  step:1},
+  {id:'M2u',  name:'全音上',  step:2},
+  {id:'m3d',  name:'短3度下', step:-3},
+  {id:'rand', name:'ランダム', step:'r'},
+];
 
-function log(cls, text) {
-  if ($('chkPause').checked) return;
-  pending.push({ cls, text });
-  if (!flushQueued) { flushQueued = true; requestAnimationFrame(flush); }
-}
-function flush() {
-  flushQueued = false;
-  if (!pending.length) return;
-  const frag = document.createDocumentFragment();
-  // 新しいものが上 = 逆順に積んで先頭へ挿入
-  for (let i = pending.length - 1; i >= 0; i--) {
-    const d = document.createElement('div');
-    d.className = pending[i].cls;
-    d.textContent = pending[i].text;
-    frag.appendChild(d);
-  }
-  pending.length = 0;
-  logEl.insertBefore(frag, logEl.firstChild);
-  while (logEl.childNodes.length > 400) logEl.removeChild(logEl.lastChild);
-}
+/* ===================== 状態 ===================== */
+const state={
+  presetTab:1, presetIdx:1,     /* 既定：IIm7–V7–Imaj7 */
+  keyFifth:0, keyPat:'P4u',
+  pos:0, cycles:0, cleared:0,
+  notation:'std', showDeg:true, hint:false,
+  graceMs:60,
+};
+const cur=()=>PRESETS[state.presetTab].items[state.presetIdx];
+const chordAt=i=>cur().chords[i];
+const isMinor=()=>cur().mode==='minor';
+const refFifth=()=>state.keyFifth+(isMinor()?3:0);
+const chordFifth=c=>refFifth()+c.rel;
+const bassFifthOf=c=>refFifth()+c.bass;
+const sameDeg=(a,b)=>a!=null&&b!=null&&mod(a-b,12)===0;
+const hasBass=c=>c.bass!=null&&!sameDeg(c.bass,c.rel);
+const qLabel=q=>state.notation==='jazz'?(JAZZ_Q[q]??q):q;
+const keyOrder=()=>[0,1,2,3,4,5,6,-5,-4,-3,-2,-1];
+const fifthOfPc=pc=>keyOrder().find(kf=>pcOf(kf)===pc);
 
-/* ---------- 画面更新 ---------- */
-let uiQueued = false;
-const requestUI = () => { if (!uiQueued) { uiQueued = true; requestAnimationFrame(renderUI); } };
+/* 押している音（MIDIノート番号 → true）。集合で持つので重複ポートは自然に吸収される。 */
+const held=new Set();
+let badTimer=null, showBad=false;
 
-function renderUI() {
-  uiQueued = false;
-
-  // 押している音
-  const hs = [...held.keys()].sort((a, b) => a - b);
-  const heldEl = $('held');
-  heldEl.textContent = '';
-  if (!hs.length) {
-    heldEl.innerHTML = '<span class="none">なし</span>';
-  } else {
-    hs.forEach((n, i) => {
-      const s = document.createElement('span');
-      s.className = 'note' + (i === 0 ? ' low' : '');
-      s.textContent = `${noteName(n)} (${n})`;
-      heldEl.appendChild(s);
-    });
-  }
-
-  // ペダル中に離された音
-  const susEl = $('sus');
-  susEl.textContent = '';
-  if (!sustained.size) {
-    susEl.innerHTML = '<span class="none">なし</span>';
-  } else {
-    [...sustained].sort((a, b) => a - b).forEach(n => {
-      const s = document.createElement('span');
-      s.className = 'note sus';
-      s.textContent = `${noteName(n)} (${n})`;
-      susEl.appendChild(s);
-    });
-  }
-
-  // ペダル
-  const p = $('pedal');
-  p.textContent = pedalVal === null ? '—' : (pedalDown ? `踏 (${pedalVal})` : `離 (${pedalVal})`);
-  p.className = 'pedal' + (pedalDown ? ' on' : '');
-
-  // サマリー
-  $('sCh').textContent = stat.channels.size ? [...stat.channels].sort((a, b) => a - b).join(', ') : '—';
-  $('sOff').textContent = (stat.offReal || stat.offVel0)
-    ? (stat.offReal && stat.offVel0 ? `両方 (0x80:${stat.offReal} / 0x90vel0:${stat.offVel0})`
-      : stat.offReal ? `0x80 ノートオフ (${stat.offReal})`
-        : `0x90 ベロシティ0 (${stat.offVel0})`)
-    : '—';
-  $('sCC64').textContent = stat.cc64Values.size ? `値: ${[...stat.cc64Values].sort((a, b) => a - b).join(', ')}` : '受信なし';
-  const others = [...stat.cc.entries()].filter(([n]) => n !== 64);
-  $('sCC').textContent = others.length ? others.map(([n, v]) => `${n}=${v}`).join(' ') : '—';
-  $('sVel').textContent = stat.velMin === null ? '—' : `${stat.velMin} 〜 ${stat.velMax}`;
-  $('sRange').textContent = stat.noteMin === null ? '—'
-    : `${noteName(stat.noteMin)}(${stat.noteMin}) 〜 ${noteName(stat.noteMax)}(${stat.noteMax})`;
-  $('sTypes').textContent = stat.types.size ? [...stat.types].join(', ') : '—';
-  $('sCount').textContent = String(stat.count);
-}
-
-/* ---------- MIDI 解析（実機・テスト入力の共通経路） ---------- */
-function handleMessage(data, ts, src) {
-  if (t0 === null) t0 = ts;
-  const st = data[0];
-
-  // システム系（0xF0〜）
-  if (st >= 0xF0) {
-    const rt = (st === 0xF8 || st === 0xFE || st === 0xFC || st === 0xFA || st === 0xFB);
-    const nm = { 0xF0: 'SysEx', 0xF8: 'Clock', 0xFA: 'Start', 0xFB: 'Continue', 0xFC: 'Stop', 0xFE: 'ActiveSensing', 0xFF: 'Reset' }[st] || `System(${hex(st)})`;
-    stat.count++; stat.types.add(nm);
-    if (!rt || $('chkRT').checked) {
-      log('sys', `${fmtT(ts)} ${src}  ${nm}  [${[...data].map(hex).join(' ')}]`);
+/* ===================== 目標コードの展開 ===================== */
+function target(){
+  const c=chordAt(state.pos);
+  const rf=chordFifth(c), spec=Q_INT[c.q]||Q_INT[''];
+  const req=spec.req.map(f=>({f:rf+f, pc:pcOf(rf+f)}));
+  const opt=(spec.opt||[]).map(f=>({f:rf+f, pc:pcOf(rf+f)}));
+  const needPc=new Set(req.map(x=>x.pc));
+  let bassPc=null;
+  if(hasBass(c)){
+    const bf=bassFifthOf(c);
+    bassPc=pcOf(bf);
+    if(!needPc.has(bassPc)){          /* F/G の G のように構成音でないベースを必須に加える */
+      needPc.add(bassPc); req.push({f:bf, pc:bassPc});
     }
-    requestUI();
+  }
+  const optPc=new Set(opt.map(x=>x.pc).filter(pc=>!needPc.has(pc)));
+  return {c, rootFifth:rf, req, opt, needPc, optPc, bassPc};
+}
+
+/* ===================== 判定（資料6章） ===================== */
+function judge(t){
+  const played=new Set([...held].map(n=>mod(n,12)));
+  const missing=[...t.needPc].filter(pc=>!played.has(pc));
+  const extra  =[...played].filter(pc=>!t.needPc.has(pc)&&!t.optPc.has(pc));
+  let bassOk=true;
+  if(t.bassPc!==null&&held.size) bassOk=mod(Math.min(...held),12)===t.bassPc;
+  return {played, missing, extra, bassOk,
+          ok: missing.length===0 && extra.length===0 && bassOk};
+}
+
+/* ===================== 進行 ===================== */
+function advance(){
+  state.pos++;
+  if(state.pos>=cur().chords.length){
+    state.pos=0; state.cycles++;
+    const p=KEYPATS.find(k=>k.id===state.keyPat);
+    if(p&&p.step!==null){
+      const now=pcOf(state.keyFifth);
+      let next;
+      if(p.step==='r'){ do{ next=Math.floor(Math.random()*12); }while(next===now); }
+      else next=mod(now+p.step,12);
+      state.keyFifth=fifthOfPc(next);
+    }
+  }
+  clearBad();
+}
+function restart(){ state.pos=0; state.cycles=0; state.cleared=0; clearBad(); render(); }
+function clearBad(){ if(badTimer){clearTimeout(badTimer);badTimer=null;} showBad=false; }
+
+/* ===================== MIDI 受信 ===================== */
+function onNote(num,on){
+  if(on){ held.add(num); goodUntil=0; }   /* 次のコードを弾き始めたら正解の緑を消す */
+  else held.delete(num);
+  const t=target(), r=judge(t);
+
+  if(r.ok){
+    state.cleared++;
+    flashGood();
+    advance();
+    render();
     return;
   }
-
-  const type = st & 0xF0, ch = (st & 0x0F) + 1;
-  const d1 = data[1], d2 = data[2];
-  stat.count++; stat.channels.add(ch);
-  const bytes = [...data].map(hex).join(' ');
-  const head = `${fmtT(ts)} ${src} ch${String(ch).padStart(2)} [${bytes}]`;
-
-  switch (type) {
-    case 0x90:
-      if (d2 > 0) {
-        stat.types.add('NoteOn');
-        held.set(d1, { vel: d2, ch });
-        sustained.delete(d1);
-        stat.velMin = stat.velMin === null ? d2 : Math.min(stat.velMin, d2);
-        stat.velMax = stat.velMax === null ? d2 : Math.max(stat.velMax, d2);
-        stat.noteMin = stat.noteMin === null ? d1 : Math.min(stat.noteMin, d1);
-        stat.noteMax = stat.noteMax === null ? d1 : Math.max(stat.noteMax, d1);
-        log('on', `${head}  NoteOn   ${noteName(d1)}(${d1}) vel=${d2}`);
-      } else {
-        stat.types.add('NoteOn(vel0)'); stat.offVel0++;
-        noteOff(d1);
-        log('off', `${head}  NoteOff* ${noteName(d1)}(${d1}) ← 0x90 vel0`);
-      }
-      break;
-
-    case 0x80:
-      stat.types.add('NoteOff'); stat.offReal++;
-      noteOff(d1);
-      log('off', `${head}  NoteOff  ${noteName(d1)}(${d1}) vel=${d2}`);
-      break;
-
-    case 0xB0: {
-      stat.types.add('CC');
-      stat.cc.set(d1, d2);
-      let extra = '';
-      if (d1 === 64) {
-        stat.cc64Values.add(d2);
-        const down = d2 >= 64;
-        if (pedalDown && !down) sustained.clear();
-        pedalDown = down; pedalVal = d2;
-        extra = down ? ' ← ダンパー踏' : ' ← ダンパー離';
-      }
-      log('cc', `${head}  CC${String(d1).padStart(3)}  value=${d2}${extra}`);
-      break;
-    }
-
-    case 0xA0:
-      stat.types.add('PolyAT');
-      log('other', `${head}  PolyAT   ${noteName(d1)}(${d1}) ${d2}`);
-      break;
-    case 0xC0:
-      stat.types.add('ProgramChange');
-      log('other', `${head}  Program  ${d1}`);
-      break;
-    case 0xD0:
-      stat.types.add('ChannelAT');
-      log('other', `${head}  ChanAT   ${d1}`);
-      break;
-    case 0xE0:
-      stat.types.add('PitchBend');
-      log('other', `${head}  Bend     ${((d2 << 7) | d1) - 8192}`);
-      break;
-    default:
-      stat.types.add(`Unknown(${hex(type)})`);
-      log('other', `${head}  ?`);
+  /* 間違いは猶予を置いてから赤くする（コードの移り変わりを誤検出しないため） */
+  clearBad();
+  if(r.extra.length||(!r.bassOk&&held.size)){
+    badTimer=setTimeout(()=>{
+      badTimer=null;
+      const t2=target(), r2=judge(t2);
+      if(!r2.ok&&(r2.extra.length||(!r2.bassOk&&held.size))){ showBad=true; render(); }
+    }, Math.max(0,state.graceMs));
   }
-  requestUI();
+  render();
 }
 
-function noteOff(n) {
-  if (held.delete(n) && pedalDown) sustained.add(n);
+function handleMessage(data){
+  const st=data[0];
+  if(st>=0xF0) return;
+  const type=st&0xF0, d1=data[1], d2=data[2];
+  if(type===0x90&&d2>0) onNote(d1,true);
+  else if(type===0x80||(type===0x90&&d2===0)) onNote(d1,false);   /* vel0 は保険 */
 }
 
-function fmtT(ts) {
-  const ms = Math.max(0, ts - t0);
-  return (ms / 1000).toFixed(3).padStart(9);
-}
-
-/* ---------- 接続 ---------- */
-function setStatus(text, cls) {
-  const el = $('status');
-  el.textContent = text;
-  el.className = cls || '';
-}
-
-async function connect() {
-  if (!navigator.requestMIDIAccess) {
-    setStatus('このブラウザは Web MIDI API に対応していません（Safari は非対応。iPadでは MIDIWeb Browser、Macでは Chrome を使ってください）', 'ng');
+let midi=null;
+async function connect(){
+  if(!navigator.requestMIDIAccess){
+    setStatus('このブラウザは Web MIDI API に非対応です（Safari は非対応。iPadでは MIDIWeb Browser、Macでは Chrome）','ng');
     return;
   }
   setStatus('接続中…');
-  try {
-    // sysex は要求しない（権限の段が増えるだけで、今回は不要）
-    midi = await navigator.requestMIDIAccess({ sysex: false });
-  } catch (e) {
-    setStatus('MIDIへのアクセスが拒否されました: ' + e.message, 'ng');
-    return;
-  }
-  midi.onstatechange = () => { attachAll(); renderDevices(); };
+  try{ midi=await navigator.requestMIDIAccess({sysex:false}); }
+  catch(e){ setStatus('MIDIへのアクセスが拒否されました: '+e.message,'ng'); return; }
+  midi.onstatechange=attachAll;
   attachAll();
-  renderDevices();
-  $('btnConnect').disabled = true;
+  document.getElementById('btnConnect').disabled=true;
 }
-
-function attachAll() {
-  let n = 0;
-  for (const input of midi.inputs.values()) {
-    input.onmidimessage = ev => handleMessage(ev.data, ev.timeStamp, label(input));
-    n++;
+function attachAll(){
+  const names=[];
+  for(const i of midi.inputs.values()){
+    i.onmidimessage=ev=>handleMessage(ev.data);
+    names.push(i.name);
   }
-  if (n === 0) {
-    setStatus('MIDIに接続しましたが、入力デバイスが1つも見つかりません（ピアノの電源／Bluetooth MIDIのペアリングを確認）', 'warn');
-  } else {
-    setStatus(`接続済み — 入力 ${n} 個をすべて監視中。鍵盤を弾いてください`, 'ok');
+  if(!names.length) setStatus('入力デバイスが見つかりません（ピアノの電源・Bluetooth MIDI のペアリングを確認）','ng');
+  else{ setStatus('接続済み：'+names.join(' / '),'ok'); setMsg('弾いてください','dim'); }
+}
+const setStatus=(t,c)=>{const e=document.getElementById('status');e.textContent=t;e.className=c||'';};
+const setMsg=(t,c)=>{const e=document.getElementById('msg');e.textContent=t;e.className='msg '+(c||'');};
+
+/* ===================== 表示 ===================== */
+const $=id=>document.getElementById(id);
+
+function chordText(c){
+  const root=nn(chordFifth(c));
+  const b=hasBass(c)?`<span class="b">/${nn(bassFifthOf(c))}</span>`:'';
+  return root+qLabel(c.q)+b;
+}
+function degText(c){
+  return degreeLabel(c.rel)+qLabel(c.q)+(hasBass(c)?'/'+degreeLabel(c.bass):'');
+}
+const keyLabel=()=>isMinor()?nn(state.keyFifth+3)+'m':nn(state.keyFifth);
+
+let goodUntil=0;
+function flashGood(){ goodUntil=performance.now()+260; setTimeout(render,270); }
+
+function render(){
+  const t=target(), c=t.c, r=judge(t);
+  const chords=cur().chords;
+
+  $('keyName').textContent=keyLabel();
+  $('progName').textContent=cur().name;
+  $('counter').textContent=`${state.pos+1} / ${chords.length}　周 ${state.cycles}　正解 ${state.cleared}`;
+
+  $('chord').innerHTML=chordText(c);
+  $('deg').innerHTML=state.showDeg?degText(c):'&nbsp;';
+  const nx=chords[(state.pos+1)%chords.length];
+  $('next').innerHTML=chords.length>1?`次： <b>${chordText(nx)}</b>`:'&nbsp;';
+
+  const stage=$('stage');
+  stage.className='stage'+(performance.now()<goodUntil?' good':(showBad?' bad':''));
+
+  /* 状態メッセージ */
+  if(performance.now()<goodUntil) setMsg('正解','ok');
+  else if(showBad&&r.extra.length) setMsg(`余分な音が ${r.extra.length} つ`,'ng');
+  else if(showBad&&!r.bassOk) setMsg(`最低音が ${nn(bassFifthOf(c))} ではありません`,'ng');
+  else if(!held.size) setMsg(midi?'弾いてください':'「MIDIに接続」を押してください','dim');
+  else if(r.missing.length) setMsg(`あと ${r.missing.length} 音`,'dim');
+  else setMsg('　','dim');
+
+  /* 構成音ヒント */
+  $('hintBox').hidden=!state.hint;
+  if(state.hint){
+    const box=$('hintChips'); box.textContent='';
+    const add=(x,cls)=>{
+      const s=document.createElement('span');
+      s.className='chip '+cls+(x.pc===t.bassPc?' bass':'');
+      s.textContent=nn(x.f);
+      if(r.played.has(x.pc)) s.className='chip got'+(x.pc===t.bassPc?' bass':'');
+      box.appendChild(s);
+    };
+    t.req.forEach(x=>add(x,'need'));
+    t.opt.filter(x=>t.optPc.has(x.pc)).forEach(x=>add(x,'opt'));
   }
-}
 
-function label(input) {
-  const s = (input.name || 'unknown').slice(0, 14);
-  return s.padEnd(14);
-}
-
-function renderDevices() {
-  const el = $('devs');
-  el.textContent = '';
-  const rows = [];
-  for (const i of midi.inputs.values()) {
-    rows.push(`IN   ${i.name}  [${i.manufacturer || '-'}]  state=${i.state} conn=${i.connection}`);
+  /* 押している音 */
+  const pbox=$('playChips'); pbox.textContent='';
+  if(!held.size){
+    const s=document.createElement('span');
+    s.style.cssText='color:var(--dim);font-size:13px'; s.textContent='なし';
+    pbox.appendChild(s);
+  }else{
+    const lo=Math.min(...held);
+    [...held].sort((a,b)=>a-b).forEach(n=>{
+      const pc=mod(n,12);
+      const bad=showBad&&r.extra.includes(pc);
+      const isLow=n===lo&&t.bassPc!==null;
+      const s=document.createElement('span');
+      s.className='chip '+(bad?'bad':'got')+(isLow?(r.bassOk?' bass':' bassng'):'');
+      s.textContent=PC_NAMES[pc]+(Math.floor(n/12)-1);
+      pbox.appendChild(s);
+    });
   }
-  for (const o of midi.outputs.values()) {
-    rows.push(`OUT  ${o.name}  [${o.manufacturer || '-'}]  state=${o.state}`);
+
+  drawKeyboard(t,r);
+}
+
+/* ---- 鍵盤 ---- */
+const PC_NAMES=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const isBlack=pc=>[1,3,6,8,10].includes(pc);
+function drawKeyboard(t,r){
+  /* 既定は C2〜C6。範囲外の音を弾いたらオクターブ単位で広げる（音が消えないように） */
+  let LO=36, HI=84;
+  if(held.size){
+    LO=Math.min(LO, Math.floor(Math.min(...held)/12)*12);
+    HI=Math.max(HI, Math.ceil((Math.max(...held)+1)/12)*12);
   }
-  if (!rows.length) { el.innerHTML = '<div class="none">デバイスなし</div>'; return; }
-  rows.forEach(r => { const d = document.createElement('div'); d.textContent = r; el.appendChild(d); });
+  const whites=[]; for(let n=LO;n<=HI;n++) if(!isBlack(mod(n,12))) whites.push(n);
+  const W=100/whites.length, H=26, BW=W*0.62, BH=H*0.62;
+  const lo=held.size?Math.min(...held):null;
+  const fill=n=>{
+    if(!held.has(n)) return null;
+    const pc=mod(n,12);
+    if(showBad&&r.extra.includes(pc)) return '#c9403c';
+    if(t.bassPc!==null&&n===lo) return r.bassOk?'#c9a227':(showBad?'#c9403c':'#6b6055');
+    return '#3f9fd0';
+  };
+  let s='';
+  whites.forEach((n,i)=>{
+    const f=fill(n);
+    s+=`<rect x="${(i*W).toFixed(3)}" y="0" width="${(W*0.97).toFixed(3)}" height="${H}" rx="0.5" `
+      +`fill="${f||'#e9e2d6'}" stroke="#14110f" stroke-width="0.25"/>`;
+  });
+  /* 黒鍵：白鍵の境目に置く */
+  for(let n=LO;n<=HI;n++){
+    if(!isBlack(mod(n,12))) continue;
+    const wi=whites.findIndex(w=>w>n);        /* 右隣の白鍵 */
+    if(wi<0) continue;
+    const f=fill(n);
+    s+=`<rect x="${(wi*W-BW/2).toFixed(3)}" y="0" width="${BW.toFixed(3)}" height="${BH.toFixed(3)}" rx="0.4" `
+      +`fill="${f||'#221e1b'}" stroke="#14110f" stroke-width="0.25"/>`;
+  }
+  /* C の目印 */
+  whites.forEach((n,i)=>{
+    if(mod(n,12)!==0) return;
+    s+=`<text x="${(i*W+W*0.48).toFixed(3)}" y="${H-1.2}" text-anchor="middle" font-size="2.6" `
+      +`fill="${held.has(n)?'rgba(255,255,255,.75)':'#9c9483'}">C${Math.floor(n/12)-1}</text>`;
+  });
+  $('kb').innerHTML=s;
 }
 
-/* ---------- テスト入力（実機と同じ handleMessage を通す） ---------- */
-function inject(bytes) {
-  handleMessage(Uint8Array.from(bytes), performance.now(), 'TEST'.padEnd(14));
-}
-window.__inject = inject;
-
-let ch10On = false;
-const TESTS = {
-  'cmaj': () => { inject([0x90, 60, 80]); inject([0x90, 64, 78]); inject([0x90, 67, 82]); },
-  'cmaj-off80': () => { inject([0x80, 60, 0]); inject([0x80, 64, 0]); inject([0x80, 67, 0]); },
-  'cmaj-off90': () => { inject([0x90, 60, 0]); inject([0x90, 64, 0]); inject([0x90, 67, 0]); },
-  'ped-on': () => inject([0xB0, 64, 127]),
-  'ped-off': () => inject([0xB0, 64, 0]),
-  'ch10': () => { ch10On = !ch10On; inject([0x99, 48, ch10On ? 100 : 0]); },
-};
-
-/* ---------- 配線 ---------- */
-$('btnConnect').addEventListener('click', connect);
-$('btnClear').addEventListener('click', () => {
-  logEl.textContent = ''; pending.length = 0;
-  held.clear(); sustained.clear(); pedalDown = false; pedalVal = null;
-  stat.count = 0; stat.channels.clear(); stat.offReal = 0; stat.offVel0 = 0;
-  stat.cc.clear(); stat.cc64Values.clear(); stat.types.clear();
-  stat.velMin = stat.velMax = stat.noteMin = stat.noteMax = null;
-  t0 = null;
-  renderUI();
-});
-document.querySelectorAll('[data-test]').forEach(b => {
-  b.addEventListener('click', () => TESTS[b.dataset.test]());
-});
-
-if (!window.isSecureContext) {
-  const w = $('secWarn');
-  w.hidden = false;
-  w.textContent = '⚠ 安全なコンテキスト(https または localhost)ではありません。Web MIDI は拒否される可能性があります。';
-}
-if (!navigator.requestMIDIAccess) {
-  setStatus('このブラウザは Web MIDI API に対応していません（Safari は非対応。iPadでは MIDIWeb Browser、Macでは Chrome）', 'ng');
-  $('btnConnect').disabled = true;
+/* ---- 設定UI ---- */
+function renderSettings(){
+  $('tabs').innerHTML=PRESETS.map((g,i)=>
+    `<button class="pat-btn${i===state.presetTab?' on':''}" data-tab="${i}">${g.tab}</button>`).join('');
+  $('plist').innerHTML=PRESETS[state.presetTab].items.map((it,i)=>
+    `<button class="${i===state.presetIdx?"on":""}" data-item="${i}">${it.name}</button>`).join('');
+  $('presetNote').textContent=PRESETS[state.presetTab].note;
+  $('keyPat').innerHTML=KEYPATS.map(p=>
+    `<button class="pat-btn${p.id===state.keyPat?' on':''}" data-kp="${p.id}">${p.name}</button>`).join('');
+  $('btnNotation').classList.toggle('on',state.notation==='jazz');
+  $('btnDegree').classList.toggle('on',state.showDeg);
+  $('btnHint').classList.toggle('on',state.hint);
 }
 
-renderUI();
+/* ---- 配線 ---- */
+$('btnConnect').onclick=connect;
+$('btnSkip').onclick=()=>{ advance(); render(); };
+$('btnRestart').onclick=restart;
+$('btnHint').onclick=()=>{ state.hint=!state.hint; renderSettings(); render(); };
+$('btnNotation').onclick=()=>{ state.notation=state.notation==='jazz'?'std':'jazz'; renderSettings(); render(); };
+$('btnDegree').onclick=()=>{ state.showDeg=!state.showDeg; renderSettings(); render(); };
+$('grace').oninput=e=>{ state.graceMs=Math.max(0,Math.min(500,+e.target.value||0)); };
+$('tabs').onclick=e=>{ const b=e.target.closest('[data-tab]'); if(!b)return;
+  state.presetTab=+b.dataset.tab; state.presetIdx=0; restart(); renderSettings(); };
+$('plist').onclick=e=>{ const b=e.target.closest('[data-item]'); if(!b)return;
+  state.presetIdx=+b.dataset.item; restart(); renderSettings(); };
+$('keyPat').onclick=e=>{ const b=e.target.closest('[data-kp]'); if(!b)return;
+  state.keyPat=b.dataset.kp; renderSettings(); };
+
+/* テスト用：実機と同じ経路に偽MIDIを流す */
+window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
+window.__dbg={state,held,target,judge,render,advance,nn,pcOf,chordFifth,bassFifthOf,PRESETS};
+
+if(!navigator.requestMIDIAccess){
+  setStatus('このブラウザは Web MIDI API に非対応です（iPadでは MIDIWeb Browser、Macでは Chrome）','ng');
+  $('btnConnect').disabled=true;
+}
+renderSettings();
+render();
 </script>
 </body>
 </html>
