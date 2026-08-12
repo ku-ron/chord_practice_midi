@@ -935,10 +935,12 @@ function metronome(c,W,K,T){
   const per=state.beatsPerChord, gap=13*K, dy=py+13*K;
   let dot='';
   for(let i=0;i<per;i++){
-    const cx=px+(i-(per-1)/2)*gap, cur=on&&state.beatIn===i;
-    dot+=`<circle class="metroBeat${cur?' on':''}" data-b="${i}" cx="${f2(cx)}" cy="${f2(dy)}" `+
-         `r="${((cur?4.4:2.6)*K).toFixed(2)}" fill="${cur?T.brass:'none'}" `+
-         `stroke="${cur?'none':T.node}" stroke-width="${(1.2*K).toFixed(2)}"/>`;
+    const cx=px+(i-(per-1)/2)*gap;
+    const on_=on&&state.beatIn>=i;          /* いまの拍までを塗る */
+    dot+=`<circle class="metroBeat${on_?' on':''}" data-b="${i}" `+
+         `cx="${f2(cx)}" cy="${f2(dy)}" r="${((on_?4:2.6)*K).toFixed(2)}" `+
+         `fill="${on_?T.brass:'none'}" stroke="${on_?'none':T.node}" `+
+         `stroke-width="${(1.2*K).toFixed(2)}"/>`;
   }
   const cd=on&&state.countdown
     ? `<text class="mono" x="${f2(px)}" y="${f2(py-L-6*K)}" text-anchor="middle" `+
@@ -1260,7 +1262,7 @@ function uiLoop(){
   while(uiQ.length && uiQ[0].t+lat <= actx.currentTime){
     const e=uiQ.shift();
     state.tick=e.tick; state.beatLevel=e.lv; state.beatIn=e.bi;
-    metroBeatT=e.t; metroDir=mod(e.tick|0,2)?1:-1; metroStarted=true; metroBeatN++;
+    metroBeatT=e.t; metroDir=mod(e.tick|0,2)?-1:1; metroStarted=true; metroBeatN++;
     if(e.count){ state.countdown=e.count; state.playChord=null; }
     else{
       const moved=(e.adv||state.playChord!==e.ci);
