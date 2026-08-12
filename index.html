@@ -150,6 +150,10 @@
       <button id="btnDegree" class="on">度数を表示</button>
     </div>
 
+    <h2 style="margin-top:14px">最低音のきまり</h2>
+    <div class="row" id="bassRule"></div>
+    <div class="note-s">分数コード（オンコード）は、どちらを選んでも<b>指定したベース音が最低音であること</b>を要求します。ここで選ぶのは、分数コードでないコードの扱いです。</div>
+
     <h2 style="margin-top:14px">判定</h2>
     <div class="row">
       <label style="color:var(--dim);font-size:13px">ミスを赤くするまでの猶予
@@ -307,8 +311,12 @@ const state={
   keyFifth:0, keyPat:'P4u',
   pos:0, cycles:0, cleared:0,
   notation:'std', showDeg:true, hint:false,
-  graceMs:60,
+  graceMs:60, bassRule:'root',      /* 'root' = ルートを最低音に / 'any' = 転回形を許す */
 };
+const BASSRULES=[
+  {id:'root', name:'ルートを最低音に'},
+  {id:'any',  name:'転回形を許す'},
+];
 const cur=()=>PRESETS[state.presetTab].items[state.presetIdx];
 const chordAt=i=>cur().chords[i];
 const isMinor=()=>cur().mode==='minor';
@@ -332,16 +340,19 @@ function target(){
   const req=spec.req.map(f=>({f:rf+f, pc:pcOf(rf+f)}));
   const opt=(spec.opt||[]).map(f=>({f:rf+f, pc:pcOf(rf+f)}));
   const needPc=new Set(req.map(x=>x.pc));
-  let bassPc=null;
+  let bassPc=null, bassFifth=null;
   if(hasBass(c)){
-    const bf=bassFifthOf(c);
-    bassPc=pcOf(bf);
+    /* 分数コード：指定したベース音が最低音であることを常に要求する */
+    bassFifth=bassFifthOf(c); bassPc=pcOf(bassFifth);
     if(!needPc.has(bassPc)){          /* F/G の G のように構成音でないベースを必須に加える */
-      needPc.add(bassPc); req.push({f:bf, pc:bassPc});
+      needPc.add(bassPc); req.push({f:bassFifth, pc:bassPc});
     }
+  }else if(state.bassRule==='root'){
+    /* 分数コードでないとき：ルートを最低音に要求するかは選択式 */
+    bassFifth=rf; bassPc=pcOf(rf);
   }
   const optPc=new Set(opt.map(x=>x.pc).filter(pc=>!needPc.has(pc)));
-  return {c, rootFifth:rf, req, opt, needPc, optPc, bassPc};
+  return {c, rootFifth:rf, req, opt, needPc, optPc, bassPc, bassFifth};
 }
 
 /* ===================== 判定（資料6章） ===================== */
@@ -373,6 +384,9 @@ function advance(){
 }
 function restart(){ state.pos=0; state.cycles=0; state.cleared=0; clearBad(); render(); }
 function clearBad(){ if(badTimer){clearTimeout(badTimer);badTimer=null;} showBad=false; }
+/* 最低音の違反は、必要な音がそろってから言う。組み立ての途中（3rdを先に押した等）で
+   「最低音が違う」と出すのは早すぎるため。余分な音はいつでも間違い。 */
+const isBad=r=>r.extra.length>0||(r.missing.length===0&&!r.bassOk&&held.size>0);
 
 /* ===================== MIDI 受信 ===================== */
 function onNote(num,on){
@@ -387,14 +401,21 @@ function onNote(num,on){
     render();
     return;
   }
-  /* 間違いは猶予を置いてから赤くする（コードの移り変わりを誤検出しないため） */
+  /* 間違いは猶予を置いてから赤くする（コードの移り変わりを誤検出しないため）。
+     ★ 赤くするのはノートオンのときだけ。前のコードを1音ずつ離していく途中で
+        残りの音が「余分」に見えるが、それは間違いではないので赤くしない。
+        すでに赤いときは、余分な音が残っているかぎり離しても赤のままにする。 */
+  const wasBad=showBad;
   clearBad();
-  if(r.extra.length||(!r.bassOk&&held.size)){
-    badTimer=setTimeout(()=>{
-      badTimer=null;
-      const t2=target(), r2=judge(t2);
-      if(!r2.ok&&(r2.extra.length||(!r2.bassOk&&held.size))){ showBad=true; render(); }
-    }, Math.max(0,state.graceMs));
+  if(isBad(r)){
+    if(on){
+      showBad=wasBad;      /* すでに赤いなら、猶予の間だけ消えて点滅するのを防ぐ */
+      badTimer=setTimeout(()=>{
+        badTimer=null;
+        const r2=judge(target());
+        if(!r2.ok&&isBad(r2)){ showBad=true; render(); }
+      }, Math.max(0,state.graceMs));
+    }else showBad=wasBad;
   }
   render();
 }
@@ -467,7 +488,7 @@ function render(){
   /* 状態メッセージ */
   if(performance.now()<goodUntil) setMsg('正解','ok');
   else if(showBad&&r.extra.length) setMsg(`余分な音が ${r.extra.length} つ`,'ng');
-  else if(showBad&&!r.bassOk) setMsg(`最低音が ${nn(bassFifthOf(c))} ではありません`,'ng');
+  else if(showBad&&!r.bassOk) setMsg(`最低音が ${nn(t.bassFifth)} ではありません`,'ng');
   else if(!held.size) setMsg(midi?'弾いてください':'「MIDIに接続」を押してください','dim');
   else if(r.missing.length) setMsg(`あと ${r.missing.length} 音`,'dim');
   else setMsg('　','dim');
@@ -562,6 +583,8 @@ function renderSettings(){
   $('presetNote').textContent=PRESETS[state.presetTab].note;
   $('keyPat').innerHTML=KEYPATS.map(p=>
     `<button class="pat-btn${p.id===state.keyPat?' on':''}" data-kp="${p.id}">${p.name}</button>`).join('');
+  $('bassRule').innerHTML=BASSRULES.map(b=>
+    `<button class="pat-btn${b.id===state.bassRule?' on':''}" data-br="${b.id}">${b.name}</button>`).join('');
   $('btnNotation').classList.toggle('on',state.notation==='jazz');
   $('btnDegree').classList.toggle('on',state.showDeg);
   $('btnHint').classList.toggle('on',state.hint);
@@ -581,6 +604,8 @@ $('plist').onclick=e=>{ const b=e.target.closest('[data-item]'); if(!b)return;
   state.presetIdx=+b.dataset.item; restart(); renderSettings(); };
 $('keyPat').onclick=e=>{ const b=e.target.closest('[data-kp]'); if(!b)return;
   state.keyPat=b.dataset.kp; renderSettings(); };
+$('bassRule').onclick=e=>{ const b=e.target.closest('[data-br]'); if(!b)return;
+  state.bassRule=b.dataset.br; clearBad(); renderSettings(); render(); };
 
 /* テスト用：実機と同じ経路に偽MIDIを流す */
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
