@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>コード弾き練習（MIDI）— 12キー練習ホイール</title>
+<title>コード弾き練習 MIDI Ver. — 12キー練習ホイール</title>
 <!-- ホーム画面に追加したアイコンから開いたとき、Safariのバーを出さず全画面にする。
      タイトルは長すぎてアイコンの下で切れるので、短い名前を別に与える。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="コード練習">
+<meta name="apple-mobile-web-app-title" content="練習MIDI">
 <!-- 周辺のUIの色。テーマの切り替えに合わせて JS からも書き換える。 -->
 <meta name="theme-color" id="themeColor" content="#14110F">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,6 +24,7 @@
   --f-display:'Spectral',Georgia,'Hiragino Mincho ProN',serif;
   --f-ui:'Archivo',system-ui,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
   --f-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --got-bg:#20404F; --got-bd:#3F7794; --got-fg:#BFE6FF;
 }
 html[data-theme="light"]{
   --lacquer:#EFE9DD; --lacquer-2:#FBF8F1; --lacquer-3:#E9E2D4;
@@ -31,6 +32,7 @@ html[data-theme="light"]{
   --ivory:#2A2320; --ivory-dim:#7A7062;
   --felt:#8E1F33; --felt-lit:#A4243B; --brass:#8A6D1F;
   --line:rgba(42,35,32,.16);
+  --got-bg:#DCEBF5; --got-bd:#5D93B5; --got-fg:#1E4A63;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -135,9 +137,18 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .judge .marks{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim)}
 .judge button.sm{padding:3px 8px;font-size:11.5px;line-height:1.3;min-height:0}
 @media (pointer:coarse){.judge button.sm{padding:7px 12px;font-size:12.5px}}
-/* 接続先の名前は長くなりうる。行を押し広げて「編集を開く」を追い出さないよう幅を切る。 */
+/* 構成音のヒント。押せている音だけ色が変わるので、何が足りないかが名前で分かる。 */
+.hintrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:0 4px 8px}
+.hintrow .nc{border:1px solid var(--line);border-radius:6px;padding:3px 10px;
+  font-family:var(--f-display);font-size:15px;line-height:1.25;
+  background:var(--lacquer-3);color:var(--ivory-dim)}
+.hintrow .nc.got{background:var(--got-bg);border-color:var(--got-bd);color:var(--got-fg)}
+.hintrow .nc.opt{border-style:dashed}
+.hintrow .nc.bass{outline:2px solid var(--brass);outline-offset:1px}
+/* 接続先の名前は最後まで読めること。長ければ切らずに折り返す。 */
 #midiState{font-family:var(--f-mono);font-size:11px;color:var(--ivory-dim);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(38ch,40vw)}
+  white-space:normal;overflow-wrap:anywhere;flex:1 1 16ch;min-width:0}
+h1 .ver{font-family:var(--f-mono);font-size:15px;color:var(--brass);letter-spacing:.02em}
 #midiState.ok{color:var(--brass)}
 #midiState.ng{color:var(--felt-lit)}
 button.midi{min-width:44px}
@@ -168,8 +179,19 @@ svg.wheel .nowcell{animation:nowglow .22s ease-out}
 @keyframes nowglow{from{opacity:.3}to{opacity:1}}
 svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
 @keyframes nextblink{from{opacity:1}to{opacity:.3}}
+/* メトロノーム。拍ごとにSVGを組み直すので、片道ぶんのアニメーションが毎拍やり直される。 */
+svg.wheel .metroArm{transform:rotate(0deg)}
+svg.wheel .metroArm.l{animation:metroL linear forwards}
+svg.wheel .metroArm.r{animation:metroR linear forwards}
+@keyframes metroL{from{transform:rotate(27deg)}to{transform:rotate(-27deg)}}
+@keyframes metroR{from{transform:rotate(-27deg)}to{transform:rotate(27deg)}}
+svg.wheel .metroDot{animation:metroPulse .3s ease-out forwards}
+@keyframes metroPulse{from{opacity:1}to{opacity:.15}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}
   svg.wheel .nowcell,svg.wheel .nextcell{animation:none}
+  svg.wheel .metroArm.l{transform:rotate(-27deg);animation:none}
+  svg.wheel .metroArm.r{transform:rotate(27deg);animation:none}
+  svg.wheel .metroDot{animation:none}
   svg.wheel .nextcell{opacity:.65}}
 </style>
 </head>
@@ -177,7 +199,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
 <div class="shell">
   <header class="top">
     <span class="eyebrow">midi practice wheel</span>
-    <h1>コード弾き練習</h1>
+    <h1>コード弾き練習 <span class="ver">MIDI Ver.</span></h1>
     <button id="midiBtn" class="midi">MIDIに接続</button>
     <span id="midiState">未接続</span>
     <button id="advBtn" class="ghost advtoggle">編集を開く</button>
@@ -253,7 +275,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <p class="hint">分数コード（オンコード）は、どちらを選んでも<b>指定したベース音が最低音であること</b>を要求します。ここで選ぶのは、分数コードでないコードの扱いです。</p>
         <div class="row" style="margin-top:8px">
           <button id="hintBtn">音名ヒント</button>
-          <button id="clearMarksBtn" class="ghost">押せた印を消す</button>
+          <button id="clearMarksBtn" class="ghost">押せた印をリセット</button>
         </div>
         <div class="row" style="margin-top:10px;align-items:center;gap:8px">
           <span class="hint" style="margin:0">ミスを赤くするまで</span>
@@ -323,8 +345,10 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <div class="judge">
           <span class="msg" id="judgeMsg">&nbsp;</span>
           <span class="marks" id="marks"></span>
-          <button id="clearMarksBtn2" class="ghost sm">印を消す</button>
+          <button id="hintBtn2" class="sm">音名ヒント</button>
+          <button id="clearMarksBtn2" class="ghost sm">リセット</button>
         </div>
+        <div class="hintrow" id="hintRow" hidden></div>
 
         <div class="wheelfoot">
           <button id="prevBtn" aria-label="前の調">←</button>
@@ -521,7 +545,7 @@ const THEMES={
     div:'rgba(239,231,216,.16)',center:'#1A1614',centerEdge:'rgba(239,231,216,.10)',
     path:'rgba(239,231,216,.30)',node:'rgba(239,231,216,.45)',deg:'rgba(239,231,216,.55)',
     live:'#7E4B22',
-    doneRGB:'46,122,92', liveBad:'#6B2320', feltLit:'#C8394F',
+    doneRGB:'46,122,92', liveDone:'#2C7A57', doneEdge:'#7FE3B4', liveBad:'#6B2320', feltLit:'#C8394F',
     kbWhite:'#E9E2D6', kbBlack:'#221E1B', kbEdge:'#14110F',
     kbOn:'#3F9FD0', kbBad:'#C9403C', kbDim:'#6B6055', brass:'#C9A227'},
   light:{text:'#2A2320',dim:'#7A7062',brass:'#6E5417',feltRGB:'164,36,59',aMax:.42,aMin:.09,
@@ -530,7 +554,7 @@ const THEMES={
     div:'rgba(42,35,32,.18)',center:'#F6F1E6',centerEdge:'rgba(42,35,32,.14)',
     path:'rgba(42,35,32,.30)',node:'rgba(42,35,32,.45)',deg:'rgba(42,35,32,.52)',
     live:'#F2C94C',
-    doneRGB:'32,120,86', liveBad:'#F0A9A0', feltLit:'#A4243B',
+    doneRGB:'32,120,86', liveDone:'#8FD9B4', doneEdge:'#1E7A55', liveBad:'#F0A9A0', feltLit:'#A4243B',
     kbWhite:'#FBF8F1', kbBlack:'#3A322C', kbEdge:'#B9AE9A',
     kbOn:'#3F86B8', kbBad:'#B33330', kbDim:'#9A8D7C', brass:'#8A6D1F'}
 };
@@ -546,6 +570,7 @@ const state={
   seq:[], shifts:new Set(), closed:true,
   /* ===== MIDI版で足した状態 ===== */
   practice:'midi',        /* 'midi' = 弾いたら進む / 'tempo' = 拍で進む */
+  tick:0, beatLevel:0,    /* メトロノームの向きと強拍の色 */
   bassRule:'root', graceMs:60, settleMs:300, earlyMs:300, showNotes:false,
   marks:new Set()         /* 押せたセル。'調のピッチクラス|進行内の位置' */
 };
@@ -805,12 +830,17 @@ function drawJudge(){
   else if(!held.size) txt=midi?'弾いてください':'「MIDIに接続」を押してください';
   else if(r.missing.length) txt=`あと ${r.missing.length} 音`;
   else if(r.ok) { txt='正解'; cls='msg ok'; }
-  if(state.showNotes){
-    const names=t.req.map(x=>nnSimple(x.f)).join(' ')
-      +(t.optPc.size?'（'+t.opt.filter(x=>t.optPc.has(x.pc)).map(x=>nnSimple(x.f)).join(' ')+' は任意）':'');
-    txt=names+'　'+txt;
-  }
   el.innerHTML=txt; el.className=cls;
+
+  /* 構成音のヒント。既定では出さない（記号から音を導くのが練習の中身なので）。 */
+  const row=document.getElementById('hintRow');
+  row.hidden=!state.showNotes;
+  if(state.showNotes){
+    const chip=(x,opt)=>`<span class="nc${r.played.has(x.pc)?' got':''}${opt?' opt':''}`
+      +`${x.pc===t.bassPc?' bass':''}">${nnSimple(x.f)}</span>`;
+    row.innerHTML=t.req.map(x=>chip(x,false)).join('')
+      +t.opt.filter(x=>t.optPc.has(x.pc)).map(x=>chip(x,true)).join('');
+  }
   /* 判定の状態を1か所に出す。画面のどこが赤いかを調べなくても外から見える。 */
   document.body.dataset.judge=showBad?'bad':(r.ok&&!needReplay?'ok':'');
   document.getElementById('marks').textContent=
@@ -860,6 +890,36 @@ function cellText(x,y,am,lines){
   return o;
 }
 
+/* ===== メトロノーム =====
+   クリック音はiPad内蔵スピーカーだと聞き取りにくい（4章の理由でBluetoothへは流せない）。
+   目でも拍が取れるように、ホイールの右下の余白で振り子を振る。
+   ホイールは拍ごとに組み直されるので、そのたびにCSSアニメーションが最初から始まる。
+   拍の裏表で振る向きを入れ替えると、1拍ぶんの片道がちょうど1周期になる。 */
+function metronome(c,W,K,T){
+  if(state.practice!=='tempo') return '';  /* 「弾いて進む」には拍が無いので出さない */
+  const px=c+0.74*W, py=c+0.84*W;        /* 支点。円の外側の余白に置く */
+  const L=52*K;
+  const on=state.playing, lv=on?(state.beatLevel|0):0;
+  const bob=on?[T.node,T.brass,T.brass][lv]:T.node;
+  const rod=on?T.brass:T.node;
+  const dir=mod(state.tick|0,2)?1:-1;     /* 拍ごとに向きを入れ替える */
+  const spb=(60/state.bpm).toFixed(3);
+  const base=`<path d="M${f2(px-17*K)},${f2(py)} L${f2(px+17*K)},${f2(py)} `+
+             `L${f2(px+10*K)},${f2(py-11*K)} L${f2(px-10*K)},${f2(py-11*K)} Z" `+
+             `fill="${T.center}" stroke="${on?T.brass:T.div}" stroke-width="${(1.2*K).toFixed(2)}"/>`;
+  const arm=`<g class="metroArm${on?(dir>0?' r':' l'):''}" `+
+            `style="transform-origin:${f2(px)}px ${f2(py)}px;animation-duration:${spb}s">`+
+            `<line x1="${f2(px)}" y1="${f2(py)}" x2="${f2(px)}" y2="${f2(py-L)}" `+
+            `stroke="${rod}" stroke-width="${(2.4*K).toFixed(2)}" stroke-linecap="round"/>`+
+            `<rect x="${f2(px-6*K)}" y="${f2(py-L*0.62)}" width="${f2(12*K)}" height="${f2(8*K)}" `+
+            `rx="${(1.5*K).toFixed(2)}" fill="${bob}"/></g>`;
+  const dot=on&&lv?`<circle class="metroDot" cx="${f2(px)}" cy="${f2(py+10*K)}" r="${(4*K).toFixed(2)}" fill="${T.brass}"/>`:'';
+  const cd=on&&state.countdown
+    ? `<text class="mono" x="${f2(px)}" y="${f2(py-L-6*K)}" text-anchor="middle" `+
+      `font-size="${(15*K).toFixed(1)}" fill="${T.brass}">${state.countdown}</text>` : '';
+  return `<g pointer-events="none">${base}${arm}${dot}${cd}</g>`;
+}
+
 /* ===== ホイール描画 ===== */
 function drawWheel(){
   const n=state.chords.length, outer=R_C0+n*RT;
@@ -898,8 +958,10 @@ function drawWheel(){
       /* いま弾く区画は、同じ扇形のまま地の色を差し替えて光らせる。区画をはみ出させると
          隣のコードを隠してしまうので、大きさは変えない。 */
       if(isCell(now,kf,ci))
-        s+=`<path class="nowcell" d="${sector(c,c,r0,r1,a0,a1)}" fill="${showBad?T.liveBad:T.live}" `+
-           `stroke="${showBad?T.feltLit:T.brass}" stroke-width="${((showBad?2.2:1.4)*K).toFixed(2)}"/>`;
+        s+=`<path class="nowcell" d="${sector(c,c,r0,r1,a0,a1)}" `+
+           `fill="${showBad?T.liveBad:(done?T.liveDone:T.live)}" `+
+           `stroke="${showBad?T.feltLit:(done?T.doneEdge:T.brass)}" `+
+           `stroke-width="${((showBad?2.2:1.4)*K).toFixed(2)}"/>`;
       /* 次の区画は枠だけ。現在の調の実線の輪郭や矢印と紛れないよう、「破線＝次」という
          この図の約束に合わせる。文字より後に描きたいので ov に回す。 */
       if(isCell(nxtc,kf,ci))
@@ -963,6 +1025,7 @@ function drawWheel(){
       s+=`<circle cx="${f2(p[0])}" cy="${f2(p[1])}" r="${on?4.2:2.4}" fill="${on?T.brass:nx?T.center:T.node}" ${nx&&!on?`stroke="${T.brass}" stroke-width="1.4"`:''}/>`;
     });
   }
+  s+=metronome(c,W,K,T);
   s+=`</svg>`;
   document.getElementById('wheel').innerHTML=s;
 
@@ -1116,7 +1179,7 @@ function drawPanel(){
   document.querySelectorAll('#bassSeg button').forEach(b=>{
     b.classList.toggle('on',b.dataset.br===state.bassRule);
     b.onclick=()=>{state.bassRule=b.dataset.br;clearBad();render();};});
-  document.getElementById('hintBtn').classList.toggle('on',state.showNotes);
+  document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>b.classList.toggle('on',state.showNotes));
   document.getElementById('grace').value=state.graceMs;
   document.getElementById('settle').value=state.settleMs;
   document.getElementById('early').value=state.earlyMs;
@@ -1146,12 +1209,14 @@ function schedule(){
   if(nextTime < actx.currentTime) nextTime=actx.currentTime+0.06;
   while(nextTime < actx.currentTime + LOOKAHEAD){
     if(beat<0){
-      click(nextTime, beat===-state.countIn?2:0);
-      uiQ.push({t:nextTime, count:-beat});
+      const lv=beat===-state.countIn?2:0;
+      click(nextTime, lv);
+      uiQ.push({t:nextTime, count:-beat, lv, tick:beat});
     }else{
       const idx=mod(beat,total), ci=Math.floor(idx/per);
-      click(nextTime, idx===0?2:(idx%per===0?1:0));
-      uiQ.push({t:nextTime, ci, adv:(idx===0&&beat>0)});
+      const lv=idx===0?2:(idx%per===0?1:0);
+      click(nextTime, lv);
+      uiQ.push({t:nextTime, ci, adv:(idx===0&&beat>0), lv, tick:beat});
     }
     beat++; nextTime+=spb;
   }
@@ -1167,6 +1232,7 @@ function uiLoop(){
   const lat=outLat();
   while(uiQ.length && uiQ[0].t+lat <= actx.currentTime){
     const e=uiQ.shift();
+    state.tick=e.tick; state.beatLevel=e.lv;
     if(e.count){ state.countdown=e.count; state.playChord=null; }
     else{
       const moved=(e.adv||state.playChord!==e.ci);
@@ -1327,7 +1393,8 @@ function loadSaved(){
 
 /* ===== MIDI版で足した操作の配線 ===== */
 document.getElementById('midiBtn').onclick=connectMidi;
-document.getElementById('hintBtn').onclick=()=>{state.showNotes=!state.showNotes;render();};
+document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>
+  b.onclick=()=>{state.showNotes=!state.showNotes;render();});
 document.querySelectorAll('#clearMarksBtn,#clearMarksBtn2').forEach(b=>
   b.onclick=()=>{clearMarks();render();});
 document.getElementById('grace').oninput=e=>{state.graceMs=Math.max(0,Math.min(500,+e.target.value||0));saveSoon();};
