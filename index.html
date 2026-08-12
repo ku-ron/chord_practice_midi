@@ -890,6 +890,9 @@ function cellText(x,y,am,lines){
 /* 振り子の角度。片道が1拍。両端で速度が0になるので実物の振り子のように見える。
    拍ごとに向き(dir)が入れ替わり、前の拍の終わりと次の拍の始まりの角度が一致する。 */
 const METRO_A=27;
+/* クリック音の瞬間に強く、拍のあいだに消える。1拍ごとに必ず目に入るようにする
+   （1コード1拍だと点が1個しかなく、塗りつぶしだけでは拍が分からない）。 */
+const metroPulse=p=>Math.max(0,1-Math.max(0,p)*3.5);
 const metroAngle=(p,dir,first)=>{
   const q=Math.max(0,Math.min(1,p));
   /* 最初の1拍だけは真上から片側へ。いきなり端に飛ばないようにする。
@@ -904,13 +907,21 @@ let metroPivot=null, metroBeatT=0, metroDir=1, metroStarted=false, metroBeatN=0;
 function metroTick(){
   const g=document.getElementById('metroArm');
   if(!g||!metroPivot) return;
-  let a=0;
+  let a=0, e=0;
   if(state.playing&&actx&&metroStarted){
     const spb=60/state.bpm;
     const p=(actx.currentTime-outLat()-metroBeatT)/spb;
     a=metroAngle(p,metroDir,metroBeatN<=1);
+    e=metroPulse(p);
   }
   g.setAttribute('transform',`rotate(${a.toFixed(2)} ${f2(metroPivot.x)} ${f2(metroPivot.y)})`);
+  const nd=document.getElementById('metroNow');
+  if(nd) nd.setAttribute('r',(+nd.dataset.r*(1+0.45*e)).toFixed(2));
+  const rg=document.getElementById('metroPulse');
+  if(rg){
+    rg.setAttribute('r',(+rg.dataset.r*(1+1.9*(1-e))).toFixed(2));
+    rg.setAttribute('opacity',(e*0.8).toFixed(3));
+  }
 }
 
 function metronome(c,W,K,T){
@@ -937,8 +948,13 @@ function metronome(c,W,K,T){
   for(let i=0;i<per;i++){
     const cx=px+(i-(per-1)/2)*gap;
     const on_=on&&state.beatIn>=i;          /* いまの拍までを塗る */
-    dot+=`<circle class="metroBeat${on_?' on':''}" data-b="${i}" `+
-         `cx="${f2(cx)}" cy="${f2(dy)}" r="${((on_?4:2.6)*K).toFixed(2)}" `+
+    const cur=on&&state.beatIn===i;         /* いま鳴った拍。ここが脈打つ */
+    const r0=(on_?4:2.6)*K;
+    if(cur) dot+=`<circle id="metroPulse" cx="${f2(cx)}" cy="${f2(dy)}" r="${r0.toFixed(2)}" `+
+                 `data-r="${r0.toFixed(2)}" fill="none" stroke="${T.brass}" `+
+                 `stroke-width="${(1.6*K).toFixed(2)}" opacity="0"/>`;
+    dot+=`<circle class="metroBeat${on_?' on':''}"${cur?' id="metroNow"':''} data-b="${i}" `+
+         `data-r="${r0.toFixed(2)}" cx="${f2(cx)}" cy="${f2(dy)}" r="${r0.toFixed(2)}" `+
          `fill="${on_?T.brass:'none'}" stroke="${on_?'none':T.node}" `+
          `stroke-width="${(1.2*K).toFixed(2)}"/>`;
   }
@@ -1436,7 +1452,7 @@ document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
 window.__dbg={state,held,target,judge,curTarget,render,renderLight,advanceMidi,afterAdvance,
   clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,setPractice,
-  buildSequence,drawJudge,metroAngle,metroTick,
+  buildSequence,drawJudge,metroAngle,metroPulse,metroTick,
   play:()=>play(), stop:()=>stop(),
   reset(){held.clear();clearBad();settleUntil=0;needReplay=false;render();}};
 
