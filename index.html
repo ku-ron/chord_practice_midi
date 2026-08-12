@@ -54,8 +54,6 @@ h1{font-family:var(--f-display);font-weight:600;font-size:26px;margin:0}
 .layout.adv .stage{max-width:none}
 .panel{display:none}
 .layout.adv .panel{display:flex}
-.legend{display:none}
-.layout.adv .legend{display:flex}
 @media (max-width:960px){
   .layout.adv{grid-template-columns:1fr}
   .layout.adv .panel{order:2}
@@ -100,7 +98,7 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 /* 再生とリセットは五度圏の右上の余白へ。下の行にあると指が届きにくい。
    円の外側なので、ホイールの絵には重ならない。 */
 .presetblock{margin-top:14px}
-.presetblock .tools{align-items:center;gap:10px}
+.editrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 2px 0}
 .wheelwrap{position:relative}
 .wheelbtns{position:absolute;right:1.5%;top:2.5%;display:flex;flex-direction:column;
   align-items:center;gap:8px}
@@ -150,7 +148,8 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 .judge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   padding:6px 4px 2px;font-size:12.5px;color:var(--ivory-dim);min-height:26px}
-.judge .msg{font-family:var(--f-ui)}
+.judge .msg{font-family:var(--f-ui);flex:1 1 auto;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .judge .msg.ok{color:var(--brass)}
 .judge .msg.ng{color:var(--felt-lit)}
 .judge .marks{margin-left:auto;font-family:var(--f-mono);font-size:11.5px;color:var(--ivory-dim)}
@@ -158,15 +157,16 @@ svg.kb{display:block;width:100%;height:clamp(34px,5.2vh,58px)}
 @media (pointer:coarse){.judge button.sm{padding:7px 12px;font-size:12.5px}}
 /* 音名の行。押している音は常に出し、構成音は「音名ヒント」のときだけ出す。 */
 .hintrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;
-  padding:0 4px 8px;min-height:30px}
+  padding:0 4px 8px;min-height:35px}
 .hintrow .nlab{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;
   color:var(--ivory-dim);margin-right:1px}
 .hintrow .nlab+.nlab,.hintrow .nc+.nlab{margin-left:12px}
 .hintrow .nnone{font-size:12px;color:var(--ivory-dim)}
 .hintrow .nc.ng{background:var(--ng-bg);border-color:var(--ng-bd);color:var(--ng-fg)}
 .hintrow .nc.bassng{outline:2px dashed var(--ivory-dim);outline-offset:1px}
-.hintrow .nc{border:1px solid var(--line);border-radius:6px;padding:3px 10px;
-  font-family:var(--f-display);font-size:15px;line-height:1.25;
+.hintrow .nc{border:1px solid var(--line);border-radius:6px;padding:0 10px;height:27px;
+  display:inline-flex;align-items:center;
+  font-family:var(--f-display);font-size:15px;line-height:1;
   background:var(--lacquer-3);color:var(--ivory-dim)}
 .hintrow .nc.got{background:var(--got-bg);border-color:var(--got-bd);color:var(--got-fg)}
 .hintrow .nc.opt{border-style:dashed}
@@ -188,9 +188,6 @@ svg.wheel{display:block;width:100%;height:auto}
 svg.wheel text{font-family:var(--f-display)}
 svg.wheel .mono{font-family:var(--f-mono)}
 svg.wheel .hit{cursor:pointer;fill:transparent}
-.legend{gap:18px;flex-wrap:wrap;color:var(--ivory-dim);font-size:12.5px;margin:12px 2px 0}
-.legend b{color:var(--ivory);font-weight:500}
-.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:6px}
 /* タッチ端末：指で押せる大きさに。基本規則より後に置いて確実に上書きする */
 @media (pointer:coarse){
   button{padding:9px 12px;font-size:14px}
@@ -397,16 +394,11 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <div class="row" id="presetTabs"></div>
         <p class="hint" id="presetNote"></p>
         <div class="row" id="presetRow" style="margin-top:8px"></div>
-        <div class="tools" style="margin-top:12px">
-          <button id="advBtn" class="ghost">編集を開く</button>
-          <span class="hint" style="margin:0">進行の組み替え・調の巡り方・判定・拍・表示</span>
-        </div>
       </div>
 
-      <div class="legend">
-        <span><span class="swatch" style="background:rgba(164,36,59,.85)"></span><b>いちばん内側</b>＝着地するコード</span>
-        <span><span class="swatch" style="background:rgba(164,36,59,.22)"></span>外側ほど先に弾く</span>
-        <span><span class="swatch" style="background:var(--brass)"></span>実線＝現在の調／破線＝次の調</span>
+      <div class="editrow">
+        <button id="advBtn" class="ghost">編集を開く</button>
+        <span class="hint" style="margin:0">進行の組み替え・調の巡り方・判定・拍・表示</span>
       </div>
     </div>
   </div>
@@ -869,9 +861,9 @@ function drawJudge(){
   let txt='&nbsp;', cls='msg';
   if(showBad&&r.extra.length){ txt=`余分な音が ${r.extra.length} つ`; cls='msg ng'; }
   else if(showBad&&!r.bassOk){ txt=`最低音が ${nnSimple(t.bassFifth)} ではありません`; cls='msg ng'; }
-  else if(state.done){ txt=`全部できました（${state.marks.size} / ${totalCells()}）。リセットで最初から`; cls='msg ok'; }
-  else if(!isLive()) txt='テンポを再生すると判定します';
-  else if(!held.size) txt=midi?'弾いてください':'「MIDIに接続」を押してください';
+  else if(state.done){ txt='全部できました'; cls='msg ok'; }
+  else if(!isLive()) txt='再生すると判定します';
+  else if(!held.size) txt=midi?'弾いてください':'MIDIに接続してください';
   else if(r.missing.length) txt=`あと ${r.missing.length} 音`;
   else if(r.ok) { txt='正解'; cls='msg ok'; }
   el.innerHTML=txt; el.className=cls;

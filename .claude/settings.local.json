@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i '' \"s#const box=await p.locator\\('.stage'\\).boundingBox\\(\\);\\\\nawait p.screenshot.*#-#\" shot7.mjs)",
+      "Bash(node shot7.mjs)"
+    ]
+  }
+}
