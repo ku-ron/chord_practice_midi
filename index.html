@@ -103,6 +103,11 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 .wheelbtns{position:absolute;right:1.5%;top:2.5%;display:flex;flex-direction:column;
   align-items:center;gap:8px}
 .wheelbtns .ghost{font-size:12px;padding:5px 9px}
+/* 画面が狭いと円と余白の差が詰まり、重ねると絵を隠す。そこはホイールの上に並べる。 */
+@media (max-width:600px){
+  .wheelbtns{position:static;flex-direction:row;justify-content:flex-end;
+    align-items:center;gap:10px;margin:0 2px 6px}
+}
 .donewrap{display:inline-flex;align-items:center;gap:7px;margin-left:6px}
 .wheelhead{display:flex;align-items:center;gap:12px;padding:8px 4px 10px;
   border-bottom:1px solid var(--line);margin-bottom:6px}
@@ -123,7 +128,9 @@ input[type=range]:focus-visible{outline:2px solid var(--brass);outline-offset:4p
 .wheelfoot .seg button{padding:6px 7px;font-size:12.5px}
 .wheelfoot .play{margin-left:6px}
 .advtoggle{margin-left:auto}
-.play{width:46px;height:46px;flex:none;border-radius:50%;font-size:15px;line-height:1;
+/* 画面が狭いとホイールの円も小さくなる。右上の余白に収まる範囲で大きくする。 */
+.play{width:clamp(44px,14vw,64px);height:clamp(44px,14vw,64px);flex:none;border-radius:50%;
+  font-size:clamp(15px,4.6vw,21px);line-height:1;
   display:grid;place-items:center;background:var(--sel-bg);border-color:var(--brass);color:var(--brass)}
 .play.counting{font-family:var(--f-mono);font-size:18px}
 .prog{display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap;flex:1;min-width:0}
@@ -187,7 +194,8 @@ svg.wheel .hit{cursor:pointer;fill:transparent}
   /* この2つは .step / .seg 側の指定のほうが強いので、ここで明示的に上書きする */
   .wheelfoot > button.step{min-width:46px;padding:11px 0}
   .wheelfoot .seg button{padding:10px 11px;font-size:13.5px}
-  .play{width:56px;height:56px;font-size:18px;padding:0}
+  .play{width:clamp(48px,14vw,78px);height:clamp(48px,14vw,78px);
+    font-size:clamp(16px,4.6vw,26px);padding:0}
 }
 /* いま弾く区画は光り、次の区画は枠が点滅する。どちらも区画の内側で完結させ、
    隣を覆わない。描き直しは拍ごとなので、アニメーションもその都度やり直される。 */
@@ -348,11 +356,11 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
           <div class="prog" id="progLine"></div>
         </div>
         <div class="wheelwrap">
-          <div id="wheel"></div>
           <div class="wheelbtns">
             <button id="playBtn2" class="play" aria-label="再生／停止">▶</button>
             <button id="clearMarksBtn2" class="ghost">リセット</button>
           </div>
+          <div id="wheel"></div>
         </div>
 
         <div class="kbwrap"><svg class="kb" id="kb" viewBox="0 0 100 14" preserveAspectRatio="none"></svg></div>
@@ -873,22 +881,28 @@ function drawJudge(){
       +t.req.map(x=>chip(x,false)).join('')
       +t.opt.filter(x=>t.optPc.has(x.pc)).map(x=>chip(x,true)).join('');
   }
-  html+='<span class="nlab">押している音</span>';
-  if(!held.size){
-    html+='<span class="nnone">なし</span>';
+  /* 綴りはコードに合わせる（Dm7 なら E♯ ではなく F）。合わない音だけ♯で書く。 */
+  const spell=new Map();
+  t.req.forEach(x=>{ if(!spell.has(x.pc)) spell.set(x.pc,x.f); });
+  t.opt.forEach(x=>{ if(!spell.has(x.pc)) spell.set(x.pc,x.f); });
+  const nameOf=n=>(spell.has(mod(n,12))?nnSimple(spell.get(mod(n,12))):PC_SHARP[mod(n,12)])
+    +(Math.floor(n/12)-1);
+  const sorted=[...held].sort((a,b)=>a-b), lo=sorted[0];
+
+  if(state.showNotes){
+    /* 構成音の色がそのまま「押せているか」なので、足すのは余分な音だけでよい。
+       押している音をもう一列出すと同じことを二度書くことになる。 */
+    const ex=showBad?sorted.filter(n=>r.extra.includes(mod(n,12))):[];
+    if(ex.length) html+='<span class="nlab">余分</span>'
+      +ex.map(n=>`<span class="nc ng">${nameOf(n)}</span>`).join('');
   }else{
-    /* 綴りはコードに合わせる（Dm7 なら E♯ ではなく F）。合わない音だけ♯で書く。 */
-    const spell=new Map();
-    t.req.forEach(x=>{ if(!spell.has(x.pc)) spell.set(x.pc,x.f); });
-    t.opt.forEach(x=>{ if(!spell.has(x.pc)) spell.set(x.pc,x.f); });
-    const lo=Math.min(...held);
-    html+=[...held].sort((a,b)=>a-b).map(n=>{
-      const pc=mod(n,12);
-      const nm=(spell.has(pc)?nnSimple(spell.get(pc)):PC_SHARP[pc])+(Math.floor(n/12)-1);
-      const bad=showBad&&r.extra.includes(pc);
+    html+='<span class="nlab">押している音</span>';
+    if(!held.size) html+='<span class="nnone">なし</span>';
+    else html+=sorted.map(n=>{
+      const bad=showBad&&r.extra.includes(mod(n,12));
       const isLow=n===lo&&t.bassPc!==null;
       return `<span class="nc ${bad?'ng':'got'}`
-        +`${isLow?(r.bassOk?' bass':' bassng'):''}">${nm}</span>`;
+        +`${isLow?(r.bassOk?' bass':' bassng'):''}">${nameOf(n)}</span>`;
     }).join('');
   }
   row.innerHTML=html;
