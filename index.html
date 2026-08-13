@@ -902,24 +902,28 @@ function drawKeyboard(){
     if(t.bassPc!==null&&n===lo) return r.bassOk?T.brass:(showBad?T.kbBad:T.kbDim);
     return T.kbOn;
   };
-  /* 「鍵盤ヒント」の色。押している音より薄く、オクターブ違いも全部出す。
-     薄い色は下の鍵に重ねて描く（鍵そのものを半透明にすると背景が透けてしまう）。 */
-  const hint=n=>{
-    if(!state.showKb||held.has(n)) return null;
-    const pc=mod(n,12);
-    if(t.bassPc!==null&&pc===t.bassPc) return [T.brass,.38];
-    if(t.needPc.has(pc)) return [T.kbOn,.38];
-    if(t.optPc.has(pc)) return [T.kbOn,.17];
-    return null;
+  /* 「鍵盤ヒント」。色を薄めると黒鍵の上で沈むので、鍵の下のほうに小さな印を打つ。
+     押している音は鍵ぜんぶが染まるので、大きさで強さの差が付く。
+     preserveAspectRatio="none" で縦横の倍率が違い、円は放っておくと楕円になる。
+     いま描かれている大きさから比を取って、見た目が丸くなる rx を出す。 */
+  const box=document.getElementById('kb').getBoundingClientRect();
+  const asp=(box.width>0&&box.height>0)?(box.height/H)/(box.width/100):.35;
+  const mark=(cx,cy,n)=>{
+    if(!state.showKb||held.has(n)) return '';
+    const pc=mod(n,12), ry=1.7, rx=ry*asp;
+    const dot=(c,solid)=>`<ellipse cx="${cx.toFixed(3)}" cy="${cy.toFixed(2)}" `
+      +`rx="${rx.toFixed(3)}" ry="${ry.toFixed(2)}" `
+      +(solid?`fill="${c}"`:`fill="none" stroke="${c}" stroke-width="${(rx*0.5).toFixed(3)}"`)+`/>`;
+    if(t.bassPc!==null&&pc===t.bassPc) return dot(T.brass,true);
+    if(t.needPc.has(pc)) return dot(T.kbOn,true);
+    if(t.optPc.has(pc)) return dot(T.kbOn,false);      /* 任意の音は輪だけ */
+    return '';
   };
-  const key=(x,y,w,h,n,base)=>{
-    let o=`<rect x="${x.toFixed(3)}" y="${y}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" `
-      +`fill="${fill(n)||base}" stroke="${T.kbEdge}" stroke-width="0.18"/>`;
-    const g=hint(n);
-    if(g) o+=`<rect x="${x.toFixed(3)}" y="${y}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" `
-           +`fill="${g[0]}" opacity="${g[1]}" pointer-events="none"/>`;
-    return o;
-  };
+  /* 白鍵の印は黒鍵より下に置く。上のほうだと黒鍵に隠れる */
+  const key=(x,y,w,h,n,base)=>
+    `<rect x="${x.toFixed(3)}" y="${y}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" `
+    +`fill="${fill(n)||base}" stroke="${T.kbEdge}" stroke-width="0.18"/>`
+    +mark(x+w/2, h-2.9, n);
   let s='';
   whites.forEach((n,i)=>{ s+=key(i*W,0,W*0.97,H,n,T.kbWhite); });
   for(let n=LO;n<=HI;n++){
@@ -1614,6 +1618,9 @@ document.getElementById('settle').oninput=e=>{state.settleMs=Math.max(0,Math.min
 document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2000,+e.target.value||0));saveSoon();};
 
 /* テスト用：実機と同じ処理経路に偽のMIDIを流す */
+/* 画面幅が変わると縦横の比が変わる。印を丸く保つため鍵盤だけ引き直す */
+addEventListener('resize',()=>drawKeyboard());
+
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
 window.__dbg={state,held,target,judge,curTarget,render,renderLight,advanceMidi,afterAdvance,
   clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,TENSIONS,ALL_Q,Q_INT,qLabel,setPractice,
