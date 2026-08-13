@@ -632,7 +632,8 @@ const THEMES={
     live:'#7E4B22',
     doneRGB:'46,122,92', liveDone:'#2C7A57', doneEdge:'#7FE3B4', liveBad:'#6B2320', feltLit:'#C8394F',
     kbWhite:'#E9E2D6', kbBlack:'#221E1B', kbEdge:'#14110F',
-    kbOn:'#3F9FD0', kbBad:'#C9403C', kbDim:'#6B6055', brass:'#C9A227'},
+    kbOn:'#3F9FD0', kbBad:'#C9403C', kbDim:'#6B6055', brass:'#C9A227',
+    kbOnHi:'#7FCBF0', brassHi:'#F0C949'},
   light:{text:'#2A2320',dim:'#7A7062',brass:'#6E5417',feltRGB:'164,36,59',aMax:.42,aMin:.09,
     sep:'rgba(42,35,32,.16)',ring:'rgba(42,35,32,.07)',ringIn:'rgba(42,35,32,.035)',
     hiOut:'rgba(138,109,31,.36)',hiNext:'rgba(138,109,31,.14)',hiIn:'rgba(138,109,31,.24)',
@@ -641,7 +642,8 @@ const THEMES={
     live:'#F2C94C',
     doneRGB:'32,120,86', liveDone:'#8FD9B4', doneEdge:'#1E7A55', liveBad:'#F0A9A0', feltLit:'#A4243B',
     kbWhite:'#FBF8F1', kbBlack:'#3A322C', kbEdge:'#B9AE9A',
-    kbOn:'#3F86B8', kbBad:'#B33330', kbDim:'#9A8D7C', brass:'#8A6D1F'}
+    kbOn:'#3F86B8', kbBad:'#B33330', kbDim:'#9A8D7C', brass:'#8A6D1F',
+    kbOnHi:'#7FC4E8', brassHi:'#D9BB63'}
 };
 const TH=()=>THEMES[state.theme];
 
@@ -910,13 +912,15 @@ function drawKeyboard(){
   const asp=(box.width>0&&box.height>0)?(box.height/H)/(box.width/100):.35;
   const mark=(cx,cy,n)=>{
     if(!state.showKb||held.has(n)) return '';
-    const pc=mod(n,12), ry=1.7, rx=ry*asp;
+    /* 黒鍵の地は暗いので、そのままの色だと沈む。黒鍵の上だけ明るい側の色を使う */
+    const pc=mod(n,12), ry=1.7, rx=ry*asp, bk=isBlack(pc);
+    const blue=bk?T.kbOnHi:T.kbOn, gold=bk?T.brassHi:T.brass;
     const dot=(c,solid)=>`<ellipse cx="${cx.toFixed(3)}" cy="${cy.toFixed(2)}" `
       +`rx="${rx.toFixed(3)}" ry="${ry.toFixed(2)}" `
       +(solid?`fill="${c}"`:`fill="none" stroke="${c}" stroke-width="${(rx*0.5).toFixed(3)}"`)+`/>`;
-    if(t.bassPc!==null&&pc===t.bassPc) return dot(T.brass,true);
-    if(t.needPc.has(pc)) return dot(T.kbOn,true);
-    if(t.optPc.has(pc)) return dot(T.kbOn,false);      /* 任意の音は輪だけ */
+    if(t.bassPc!==null&&pc===t.bassPc) return dot(gold,true);
+    if(t.needPc.has(pc)) return dot(blue,true);
+    if(t.optPc.has(pc)) return dot(blue,false);        /* 任意の音は輪だけ */
     return '';
   };
   /* 白鍵の印は黒鍵より下に置く。上のほうだと黒鍵に隠れる */
