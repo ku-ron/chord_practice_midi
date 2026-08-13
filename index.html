@@ -284,6 +284,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <p class="hint">分数コード（オンコード）は、どちらを選んでも<b>指定したベース音が最低音であること</b>を要求します。ここで選ぶのは、分数コードでないコードの扱いです。</p>
         <div class="row" style="margin-top:8px">
           <button id="hintBtn">音名ヒント</button>
+          <button id="kbHintBtn">鍵盤ヒント</button>
           <button id="clearMarksBtn" class="ghost">押せた印をリセット</button>
         </div>
         <div class="row" style="margin-top:10px;align-items:center;gap:8px">
@@ -361,6 +362,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
           <span class="msg" id="judgeMsg">&nbsp;</span>
           <span class="marks" id="marks"></span>
           <button id="hintBtn2" class="sm">音名ヒント</button>
+          <button id="kbHintBtn2" class="sm">鍵盤ヒント</button>
         </div>
         <div class="hintrow" id="noteRow"></div>
 
@@ -380,6 +382,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
               <button data-b="1">1拍</button><button data-b="2">2拍</button><button data-b="4">4拍</button>
             </span>
           </span>
+          <button id="holdKeyBtn" title="1周しても調を変えず、同じ調で繰り返します">同じ調で繰り返す</button>
           <span class="donewrap">
             <span class="hint" style="margin:0">全部できたら</span>
             <span class="seg" id="doneSeg">
@@ -655,6 +658,8 @@ const state={
   beatIn:-1,              /* コード内の何拍目か（メトロノームの点） */
   bassRule:'root', graceMs:60, settleMs:300, earlyMs:300, showNotes:false,
   onComplete:'loop', done:false,   /* 全部押せたときの振る舞い */
+  holdKey:false,          /* 1周しても調を変えない */
+  showKb:false,           /* 鍵盤に構成音を薄く出す */
   marks:new Set()         /* 押せたセル。'調のピッチクラス|進行内の位置' */
 };
 
@@ -710,7 +715,7 @@ function buildSequence(){
   state.step=Math.min(state.step,state.seq.length-1);
 }
 const curFifth=()=>fifthOfPc(state.seq[state.step]);
-const nextIdx=()=>mod(state.step+1,state.seq.length);
+const nextIdx=()=>state.holdKey?state.step:mod(state.step+1,state.seq.length);
 function fifthOfPc(pc){ return keyOrder().find(kf=>pcOf(kf)===pc); }
 
 /* ===== 度数まわり ===== */
@@ -801,7 +806,7 @@ function afterAdvance(fromTempo){
 }
 function advanceMidi(){
   state.playChord=mod(activeCi()+1,state.chords.length);
-  if(state.playChord===0) state.step=mod(state.step+1,state.seq.length);
+  if(state.playChord===0&&!state.holdKey) state.step=mod(state.step+1,state.seq.length);
   afterAdvance();
 }
 /* 進行やキーの意味が変わったら、位置で付けた印は嘘になるので捨てる */
@@ -889,6 +894,7 @@ function drawKeyboard(){
   const whites=[]; for(let n=LO;n<=HI;n++) if(!isBlack(mod(n,12))) whites.push(n);
   const W=100/whites.length, H=14, BW=W*0.62, BH=H*0.62;
   const lo=held.size?Math.min(...held):null;
+  /* 押している音の色 */
   const fill=n=>{
     if(!held.has(n)) return null;
     const pc=mod(n,12);
@@ -896,18 +902,35 @@ function drawKeyboard(){
     if(t.bassPc!==null&&n===lo) return r.bassOk?T.brass:(showBad?T.kbBad:T.kbDim);
     return T.kbOn;
   };
+  /* 「鍵盤ヒント」の色。押している音より薄く、オクターブ違いも全部出す。
+     薄い色は下の鍵に重ねて描く（鍵そのものを半透明にすると背景が透けてしまう）。 */
+  const hint=n=>{
+    if(!state.showKb||held.has(n)) return null;
+    const pc=mod(n,12);
+    if(t.bassPc!==null&&pc===t.bassPc) return [T.brass,.38];
+    if(t.needPc.has(pc)) return [T.kbOn,.38];
+    if(t.optPc.has(pc)) return [T.kbOn,.17];
+    return null;
+  };
+  const key=(x,y,w,h,n,base)=>{
+    let o=`<rect x="${x.toFixed(3)}" y="${y}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" `
+      +`fill="${fill(n)||base}" stroke="${T.kbEdge}" stroke-width="0.18"/>`;
+    const g=hint(n);
+    if(g) o+=`<rect x="${x.toFixed(3)}" y="${y}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" `
+           +`fill="${g[0]}" opacity="${g[1]}" pointer-events="none"/>`;
+    return o;
+  };
   let s='';
-  whites.forEach((n,i)=>{
-    s+=`<rect x="${(i*W).toFixed(3)}" y="0" width="${(W*0.97).toFixed(3)}" height="${H}" `
-      +`fill="${fill(n)||T.kbWhite}" stroke="${T.kbEdge}" stroke-width="0.18"/>`;
-  });
+  whites.forEach((n,i)=>{ s+=key(i*W,0,W*0.97,H,n,T.kbWhite); });
   for(let n=LO;n<=HI;n++){
     if(!isBlack(mod(n,12))) continue;
     const wi=whites.findIndex(w=>w>n);
     if(wi<0) continue;
-    s+=`<rect x="${(wi*W-BW/2).toFixed(3)}" y="0" width="${BW.toFixed(3)}" height="${BH.toFixed(3)}" `
-      +`fill="${fill(n)||T.kbBlack}" stroke="${T.kbEdge}" stroke-width="0.18"/>`;
+    s+=key(wi*W-BW/2,0,BW,BH,n,T.kbBlack);
   }
+  /* 下の縁。preserveAspectRatio="none" だと横線のstrokeは縦の倍率で潰れて見えないので、
+     細い矩形で描く（縦線は横の倍率で伸びるため、そのままでよい）。 */
+  s+=`<rect x="0" y="${(H-0.5).toFixed(2)}" width="100" height="0.5" fill="${T.kbBlack}"/>`;
   document.getElementById('kb').innerHTML=s;
 }
 
@@ -1109,7 +1132,7 @@ function drawWheel(){
   /* 「弾いて進む」では常に現在地を出す。ホイールが弾くべきコードの表示そのものなので、
      再生ボタンで隠れてしまってはいけない。テンポでは従来どおり再生中だけ。 */
   const li=state.practice==='midi'?activeCi():(state.playing?state.playChord:null);
-  const at=k=>{const t=li+k, d=Math.floor(t/n);
+  const at=k=>{const t=li+k, d=state.holdKey?0:Math.floor(t/n);
     return {kf:fifthOfPc(state.seq[mod(state.step+d,state.seq.length)]), ci:mod(t,n)};};
   /* カウントイン中は playChord がまだ無い。これから弾く最初のコードを「次」として
      点滅させると、入りの構えが取れる。 */
@@ -1189,7 +1212,7 @@ function drawWheel(){
     for(let i=0;i<P.length;i++){
       const j=mod(i+1,P.length);
       const dashed=state.shifts.has(j)||(j===0&&!state.closed);
-      const isCurEdge=(i===state.step);
+      const isCurEdge=(i===state.step&&!state.holdKey);
       const col=isCurEdge?T.brass:T.path;
       s+=`<line x1="${f2(P[i][0])}" y1="${f2(P[i][1])}" x2="${f2(P[j][0])}" y2="${f2(P[j][1])}" `+
          `stroke="${col}" stroke-width="${isCurEdge?2:1.1}" ${dashed?'stroke-dasharray="4 4"':''} opacity="${isCurEdge?1:.75}"/>`;
@@ -1357,12 +1380,14 @@ function drawPanel(){
     b.classList.toggle('on',b.dataset.br===state.bassRule);
     b.onclick=()=>{state.bassRule=b.dataset.br;clearBad();render();};});
   document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>b.classList.toggle('on',state.showNotes));
+  document.querySelectorAll('#kbHintBtn,#kbHintBtn2').forEach(b=>b.classList.toggle('on',state.showKb));
   document.getElementById('grace').value=state.graceMs;
   document.getElementById('settle').value=state.settleMs;
   document.getElementById('early').value=state.earlyMs;
   /* テンポでしか使わない操作は「弾いて進む」では隠す。押せてしまうと意味が通らない。 */
   document.getElementById('tempoOnly').style.display=state.practice==='tempo'?'contents':'none';
   document.getElementById('playBtn2').style.display=state.practice==='tempo'?'':'none';
+  document.getElementById('holdKeyBtn').classList.toggle('on',state.holdKey);
   document.querySelectorAll('#doneSeg button').forEach(b=>{
     b.classList.toggle('on',b.dataset.d===state.onComplete);
     b.onclick=()=>{state.onComplete=b.dataset.d;render();};});
@@ -1416,7 +1441,7 @@ function uiLoop(){
     if(e.count){ state.countdown=e.count; state.playChord=null; }
     else{
       const moved=(e.adv||state.playChord!==e.ci);
-      if(e.adv) state.step=mod(state.step+1,state.seq.length);
+      if(e.adv&&!state.holdKey) state.step=mod(state.step+1,state.seq.length);
       state.countdown=0; state.playChord=e.ci;
       /* テンポでもセルが移ったら、猶予と「弾き直し要求」を引き直す。
          そうしないと、拍で進んだ直後の遅れた指や持ち越しが同じ問題を起こす。 */
@@ -1527,7 +1552,7 @@ function setPractice(m){
 const SAVE_KEY='chord_practice_midi.v2';
 const SAVE_FIELDS=['practice','bassRule','graceMs','settleMs','showNotes',
   'theme','notation','showDeg','simplifyAcc','showPath','advanced',
-  'earlyMs','onComplete','bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
+  'earlyMs','onComplete','holdKey','showKb','bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
   'mode','startFifth','presetTab','chords'];
 let saveT=null;
 function save(){
@@ -1565,7 +1590,7 @@ function loadSaved(){
   state.countIn    =pick(num(o.countIn,0,8,4),[0,4,8],4);
   state.presetTab  =num(o.presetTab,0,PRESETS.length-1,0)|0;
   state.startFifth =keyOrder().includes(+o.startFifth)?+o.startFifth:0;
-  for(const k of ['showNotes','showDeg','simplifyAcc','showPath','coverAll','triSharp','advanced'])
+  for(const k of ['showNotes','showDeg','simplifyAcc','showPath','coverAll','triSharp','advanced','holdKey','showKb'])
     if(k in o) state[k]=!!o[k];
   /* triSharp を戻したあとに startFifth を整合させる（F♯/G♭ は同じ位置） */
   if(Math.abs(state.startFifth)===6) state.startFifth=state.triSharp?6:-6;
@@ -1575,6 +1600,9 @@ function loadSaved(){
 document.getElementById('midiBtn').onclick=connectMidi;
 document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>
   b.onclick=()=>{state.showNotes=!state.showNotes;render();});
+document.getElementById('holdKeyBtn').onclick=()=>{state.holdKey=!state.holdKey;render();};
+document.querySelectorAll('#kbHintBtn,#kbHintBtn2').forEach(b=>
+  b.onclick=()=>{state.showKb=!state.showKb;render();});
 document.querySelectorAll('#clearMarksBtn,#clearMarksBtn2').forEach(b=>b.onclick=()=>{
   clearMarks();
   /* 進行の途中（内側の輪）まで来ていたら、そこも最初へ戻す。
