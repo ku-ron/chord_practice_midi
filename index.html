@@ -240,6 +240,8 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
         <div class="row" id="rootRow" style="margin-top:10px"></div>
         <div class="row" id="degRow" style="margin-top:10px"></div>
         <div class="row" id="qualRow" style="margin-top:10px"></div>
+        <p class="hint" style="margin-top:8px">テンション（セブンスまでのコードに足す形）</p>
+        <div class="row" id="tensionRow" style="margin-top:4px"></div>
         <p class="hint">ベース（分数コード）。ルートと同じ音は選べません。</p>
         <div class="row" id="bassRow" style="margin-top:6px"></div>
       </div>
@@ -415,12 +417,22 @@ function degreeLabel(rel){const a=Math.floor((rel+1)/7);
   return (a>0?'♯'.repeat(a):a<0?'♭'.repeat(-a):'')+ROMAN[mod(rel*4,7)];}
 
 /* ===== データ ===== */
-const QUALITIES=['','m','7','maj7','m7','m7♭5','dim7','sus4','7sus4','6','m6','add9','9','m9','mM7','aug','13'];
+/* 基本のクオリティ。テンションは「セブンスまでのコードに ( ) で足す」表記で別に持つ。 */
+const QUALITIES=['','m','aug','sus4','6','m6','7','maj7','m7','m7♭5','dim7','mM7','7sus4','aug7','add9'];
+const TENSIONS=[
+  '7(9)','7(♭9)','7(♯9)','7(♯11)','7(13)','7(♭13)',
+  '7(9,13)','7(♭9,13)','7(♯9,♭13)','7(9,♯11)',
+  'maj7(9)','maj7(♯11)',
+  'm7(9)','m7(11)','m7(9,11)','m7♭5(11)','mM7(9)',
+];
+const ALL_Q=[...QUALITIES,...TENSIONS];
+/* 表記を変えたときの読み替え。保存済みの進行が黙って三和音に落ちないように。 */
+const Q_RENAME={'9':'7(9)','m9':'m7(9)','13':'7(13)'};
 /* 表示だけを差し替える対応表。state.chords が持つ q は常に上の標準表記のまま。 */
 /* Δ は U+0394（ギリシャ大文字）。三角記号 U+25B3 は和文フォントに落ちて 1em 送りになり、
    幅を詰めるという目的に反するので使わない。 */
 const JAZZ_Q={'m':'-','maj7':'Δ7','m7':'-7','m7♭5':'ø7','dim7':'°7','sus4':'sus','7sus4':'7sus',
-  'm6':'-6','m9':'-9','mM7':'-Δ7','aug':'+'};
+  'm6':'-6','mM7':'-Δ7','aug':'+','aug7':'+7'};
 
 /* ===== クオリティ → 構成音（MIDI版で追加） =====
    半音ではなく「ルートからの五度圏上の距離」で持つ。pcOf を通せば判定用のピッチクラスに、
@@ -437,12 +449,31 @@ const Q_INT={
   'dim7'  :{req:[0,-3,-6,3]},    'mM7'  :{req:[0,-3,1,5]},
   '7sus4' :{req:[0,-1,1,-2]},
   'add9'  :{req:[0,4,2],     opt:[1]},
-  '9'     :{req:[0,4,-2,2],  opt:[1]},
-  'm9'    :{req:[0,-3,-2,2], opt:[1]},
-  '13'    :{req:[0,4,-2,3],  opt:[1]},
+  'aug7'  :{req:[0,4,8,-2]},              /* 7♯5。5度が♯5に置き換わるので任意の音は無い */
+  /* ↓ テンション。9=+2 ♭9=-5 ♯9=+9 11=-1 ♯11=+6 13=+3 ♭13=-4
+     どれも5度は任意（`7(♭13)` のように5度とぶつかる形でも、押していてよい） */
+  '7(9)'      :{req:[0,4,-2,2],     opt:[1]},
+  '7(♭9)'     :{req:[0,4,-2,-5],    opt:[1]},
+  '7(♯9)'     :{req:[0,4,-2,9],     opt:[1]},
+  '7(♯11)'    :{req:[0,4,-2,6],     opt:[1]},
+  '7(13)'     :{req:[0,4,-2,3],     opt:[1]},
+  '7(♭13)'    :{req:[0,4,-2,-4],    opt:[1]},
+  '7(9,13)'   :{req:[0,4,-2,2,3],   opt:[1]},
+  '7(♭9,13)'  :{req:[0,4,-2,-5,3],  opt:[1]},
+  '7(♯9,♭13)' :{req:[0,4,-2,9,-4],  opt:[1]},
+  '7(9,♯11)'  :{req:[0,4,-2,2,6],   opt:[1]},
+  'maj7(9)'   :{req:[0,4,5,2],      opt:[1]},
+  'maj7(♯11)' :{req:[0,4,5,6],      opt:[1]},
+  'm7(9)'     :{req:[0,-3,-2,2],    opt:[1]},
+  'm7(11)'    :{req:[0,-3,-2,-1],   opt:[1]},
+  'm7(9,11)'  :{req:[0,-3,-2,2,-1], opt:[1]},
+  'm7♭5(11)'  :{req:[0,-3,-6,-2,-1]},     /* ♭5があるので任意の5度は無い */
+  'mM7(9)'    :{req:[0,-3,5,2],     opt:[1]},
 };
 const BASSRULES=[{id:'root',name:'ルートを最低音に'},{id:'any',name:'転回形を許す'}];
-const qLabel=q=>state.notation==='jazz'?(JAZZ_Q[q]??q):q;
+const qBase=q=>q.slice(0,(q.indexOf('(')+1||q.length+1)-1);
+const qTens=q=>q.slice(qBase(q).length);
+const qLabel=q=>(state.notation==='jazz'?(JAZZ_Q[qBase(q)]??qBase(q)):qBase(q))+qTens(q);
 const ROOTS=['C','C♯','D♭','D','D♯','E♭','E','F','F♯','G♭','G','G♯','A♭','A','A♯','B♭','B'];
 const DEGREES=[
   {rel:0,name:'I'},{rel:-5,name:'♭II'},{rel:2,name:'II'},{rel:-3,name:'♭III'},{rel:4,name:'III'},
@@ -538,6 +569,34 @@ const PRESETS=[
   /* アンダルシアと同じ下行ベースを、上を動かさずに作る形。Am–Am/G–F–E7。 */
   {name:'下行ベース Im–Im/♭VII–♭VI–V7', mode:'minor',
    chords:[{rel:0,q:'m'},{rel:0,q:'m',bass:-2},{rel:-4,q:''},{rel:1,q:'7'}]}
+]}
+,
+{tab:'テンション', note:'セブンスにテンションを足した形。5度は省略してもかまいません。', items:[
+  {name:'IIm7(9)–V7(9,13)–Imaj7(9)', mode:'major',
+   chords:[{rel:2,q:'m7(9)'},{rel:1,q:'7(9,13)'},{rel:0,q:'maj7(9)'}]},
+  {name:'IIm7–V7(♭9)–Imaj7', mode:'major',
+   chords:[{rel:2,q:'m7'},{rel:1,q:'7(♭9)'},{rel:0,q:'maj7'}]},
+  {name:'裏返し IIm7(11)–V7(♯9,♭13)–Imaj7(9)', mode:'major',
+   chords:[{rel:2,q:'m7(11)'},{rel:1,q:'7(♯9,♭13)'},{rel:0,q:'maj7(9)'}]},
+  {name:'循環 Imaj7(9)–VI7(♭9)–IIm7(9)–V7(♭9,13)', mode:'major',
+   chords:[{rel:0,q:'maj7(9)'},{rel:3,q:'7(♭9)'},{rel:2,q:'m7(9)'},{rel:1,q:'7(♭9,13)'}]},
+  {name:'IVmaj7(♯11)–V7(13)–Imaj7(9)', mode:'major',
+   chords:[{rel:-1,q:'maj7(♯11)'},{rel:1,q:'7(13)'},{rel:0,q:'maj7(9)'}]},
+  {name:'IIIm7(9)–VI7(♯9,♭13)–IIm7(9)–V7(9,13)', mode:'major',
+   chords:[{rel:4,q:'m7(9)'},{rel:3,q:'7(♯9,♭13)'},{rel:2,q:'m7(9)'},{rel:1,q:'7(9,13)'}]},
+  /* ドミナントを ♯5 にして、そのまま半音で内側へ落とす形 */
+  {name:'IIm7(9)–Vaug7–Imaj7(9)', mode:'major',
+   chords:[{rel:2,q:'m7(9)'},{rel:1,q:'aug7'},{rel:0,q:'maj7(9)'}]},
+  {name:'Imaj7(9)–I7(9)–IVmaj7(♯11)', mode:'major',
+   chords:[{rel:0,q:'maj7(9)'},{rel:0,q:'7(9)'},{rel:-1,q:'maj7(♯11)'}]},
+  /* 裏コード。♭II7 では ♯11 が調の音になるので座りがよい */
+  {name:'裏コード IIm7(9)–♭II7(9,♯11)–Imaj7(9)', mode:'major',
+   chords:[{rel:2,q:'m7(9)'},{rel:-5,q:'7(9,♯11)'},{rel:0,q:'maj7(9)'}]},
+  /* 短調のツーファイブ。ハーフディミニッシュは11thを足すと濁りが減る */
+  {name:'短調 VIIm7♭5(11)–III7(♭9)–VIm7(9)', mode:'major',
+   chords:[{rel:5,q:'m7♭5(11)'},{rel:4,q:'7(♭9)'},{rel:3,q:'m7(9)'}]},
+  {name:'クリシェ Im7(9)–ImM7(9)–Im7(9)–Im6', mode:'minor',
+   chords:[{rel:0,q:'m7(9)'},{rel:0,q:'mM7(9)'},{rel:0,q:'m7(9)'},{rel:0,q:'m6'}]}
 ]}
 ];
 const PATTERNS=[
@@ -1081,12 +1140,14 @@ function drawWheel(){
         ov+=`<path class="nextcell" d="${sector(c,c,r0,r1,a0,a1)}" fill="none" `+
             `stroke="${T.brass}" stroke-width="${(2.4*K).toFixed(2)}" stroke-linejoin="round" `+
             `stroke-dasharray="${(5*K).toFixed(1)} ${(3.5*K).toFixed(1)}"/>`;
-      const root=chordRoot(kf,ch), q=qLabel(ch.q), lines=[];
+      const root=chordRoot(kf,ch), q=qLabel(ch.q), qb=qBase(q), qt=qTens(q), lines=[];
       if(state.showDeg) lines.push({t:degreeLabel(ch.rel),size:9,cls:'mono',fill:T.deg});
       /* 「ダブル♯♭を簡略化」を切ると E♭♭ のような綴りが出る。これだけは段に分けても
          41.1px あり 38px に収まらないので、その語だけ字を詰める。 */
       lines.push({t:root,size:/♭♭|♯♯/.test(root)?14.2:15.5,fill:T.text});
-      if(q) lines.push({t:q,size:10.5,fill:T.text});
+      if(qb) lines.push({t:qb,size:10.5,fill:T.text});
+      /* 括弧の中は一段小さく別の行に。1行にまとめるとリング幅(38px)に収まらない */
+      if(qt) lines.push({t:qt,size:8,fill:T.text});
       /* ベース行はクオリティ行より一段小さく。従属した情報に見えるほうが読みやすく、
          4段になったときの高さも抑えられる。 */
       if(hasBass(ch)) lines.push({t:'/'+bassRoot(kf,ch),size:9.5,fill:T.text});
@@ -1250,9 +1311,12 @@ function drawPanel(){
     state.chords.map(degSymbol).join('<span class="sep">–</span>')+
     `</span><span class="note">${state.mode==='minor'?'平行短調の I を基準':'長調の I を基準'}</span>`;
 
-  const qualRow=document.getElementById('qualRow');
-  qualRow.innerHTML=QUALITIES.map(q=>`<button class="qual-btn ${q===c0.q?'on':''}" data-q="${q}">${q===''?'major':qLabel(q)}</button>`).join('');
-  qualRow.querySelectorAll('button').forEach(b=>b.onclick=()=>{state.chords[state.sel].q=b.dataset.q;clearMarks();render();});
+  const qBtn=q=>`<button class="qual-btn ${q===c0.q?'on':''}" data-q="${q}">${q===''?'major':qLabel(q)}</button>`;
+  const qualRow=document.getElementById('qualRow'), tensionRow=document.getElementById('tensionRow');
+  qualRow.innerHTML=QUALITIES.map(qBtn).join('');
+  tensionRow.innerHTML=TENSIONS.map(qBtn).join('');
+  document.querySelectorAll('#qualRow button,#tensionRow button').forEach(b=>
+    b.onclick=()=>{state.chords[state.sel].q=b.dataset.q;clearMarks();render();});
 
   const tabs=document.getElementById('presetTabs');
   tabs.innerHTML=PRESETS.map((g,i)=>`<button class="pat-btn ${i===state.presetTab?'on':''}" data-t="${i}">${g.tab}</button>`).join('');
@@ -1480,7 +1544,7 @@ function loadSaved(){
   const ok=[];
   if(Array.isArray(o.chords)) for(const c of o.chords){
     if(!c||typeof c!=='object'||!Number.isFinite(+c.rel)) continue;
-    ok.push({rel:+c.rel, q:pick(c.q,QUALITIES,''),
+    ok.push({rel:+c.rel, q:pick(Q_RENAME[c.q]??c.q,ALL_Q,''),
              bass:(c.bass==null||!Number.isFinite(+c.bass))?null:+c.bass});
   }
   if(ok.length) { state.chords=ok; state.sel=ok.length-1; }
@@ -1523,7 +1587,7 @@ document.getElementById('early').oninput=e=>{state.earlyMs=Math.max(0,Math.min(2
 /* テスト用：実機と同じ処理経路に偽のMIDIを流す */
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
 window.__dbg={state,held,target,judge,curTarget,render,renderLight,advanceMidi,afterAdvance,
-  clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,setPractice,
+  clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,TENSIONS,ALL_Q,Q_INT,qLabel,setPractice,
   buildSequence,drawJudge,metroAngle,metroPulse,metroTick,
   play:()=>play(), stop:()=>stop(),
   reset(){held.clear();clearBad();settleUntil=0;needReplay=false;render();}};
