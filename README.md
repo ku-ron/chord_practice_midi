@@ -6,6 +6,12 @@
 
 **→ MIDIモニタ　https://ku-ron.github.io/chord_practice_midi/monitor.html**
 
+## 紹介動画
+
+[![12キーでコードを弾く練習アプリ ｜ Practice Chords in All 12 Keys (Web MIDI)](https://img.youtube.com/vi/scP-1Do3ncA/maxresdefault.jpg)](https://youtu.be/scP-1Do3ncA)
+
+つなぎ方から実際に弾いているところまで、動画で見られます。→ https://youtu.be/scP-1Do3ncA
+
 姉妹プロジェクト [コード進行 12キー練習ホイール](https://github.com/ku-ron/chord_practice)（[公開版](https://ku-ron.github.io/chord_practice/)）にMIDI入力を足したものです。ホイールが「どのコードを弾くか見せる」までなのに対し、こちらは「ちゃんと弾けたか」まで見ます。ホイール・プリセット・進行の編集・調の巡り方・テンポ再生は、そのまま引き継いでいます。
 
 ---
