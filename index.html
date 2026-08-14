@@ -1471,19 +1471,19 @@ const CC_CLEAN=[[1,0],[93,0],[99,1],[98,9],[6,0]];
 const CC_SHORT=[[73,0],[75,0],[72,0]];
 
 /* 電子ピアノの音源で鳴らす音。ch1 はピアノが弾いた音を送ってくるので避けて ch16 に置く */
-const lead=(name,pc)=>({name, ch:15, pc, notes:[81,87,93], gate:30, cc:[...CC_SHORT,...CC_CLEAN]});
+const lead=(name,pc,extra=[])=>
+  ({name, ch:15, pc, notes:[81,87,93], gate:30, cc:[...CC_SHORT,...CC_CLEAN,...extra]});
 const perc=(name,pc)=>({name, ch:15, pc, notes:[81,87,93], gate:60, cc:[...CC_CLEAN]});
 const CLICK_VOICE={
-  wood   :{name:'ウッドブロック', ch:9, notes:[77,76,75], gate:60},   /* ch10のパーカッション */
-  square :lead('矩形波',80),      /* 内蔵スピーカーのクリックに近い */
-  saw    :lead('のこぎり波',81),
-  glock  :perc('グロッケン',9),   /* 澄んだ金属音。立ち上がりが速い */
-  celesta:perc('チェレスタ',8),
-  xylo   :perc('シロフォン',13),  /* 木の音。ウッドブロックに近い質感 */
-  syndrum:perc('シンセドラム',118),
+  wood:{name:'ウッドブロック', ch:9, notes:[77,76,75], gate:60},   /* ch10のパーカッション */
+  xylo:perc('シロフォン',13),     /* 木の音。ウッドブロックに近い質感 */
+  /* GM2に純粋なサイン波は無いので、単純な波形（矩形波）のフィルターを深く閉じて近づける。
+     CC74=明るさ（カットオフ）。64が既定で、下げるほど倍音が削れて丸い音になる。 */
+  sine:lead('サイン波',80,[[74,30]]),
 };
-/* 名前を変えた音色の読み替え */
-const VOICE_RENAME={beep:'square'};
+/* 消した音色の読み替え。保存済みの設定が黙って既定に戻らないように、近いものへ寄せる */
+const VOICE_RENAME={beep:'sine', square:'sine', saw:'sine',
+                    glock:'xylo', celesta:'xylo', syndrum:'xylo'};
 const clickVoice=()=>CLICK_VOICE[state.clickVoice]||CLICK_VOICE.wood;
 const CLICK_RATIO=[0.55,0.78,1];     /* 音量つまみに対する比 */
 const clickVel=lv=>Math.max(1,Math.min(127,Math.round(state.clickVel*(CLICK_RATIO[lv]??1))));
