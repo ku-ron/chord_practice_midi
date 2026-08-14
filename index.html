@@ -912,6 +912,7 @@ function attachMidi(){
     state.clickPort=(outs.find(o=>names.includes(o.name))||outs[0]||{}).id||'';
   if(!names.length) setMidiState('入力デバイスが見つかりません（電源・Bluetooth MIDI のペアリングを確認）','ng');
   else setMidiState('接続済み：'+names.join(' / '),'ok');
+  render();   /* 送り先の一覧は描き直さないと「接続すると出ます」のままになる */
 }
 
 /* ===== 鍵盤（縦は極端に潰してよい。弾くべきコードはホイールに出ている） ===== */
@@ -1470,7 +1471,12 @@ const CLICK_VOICE={
      （CC73=アタック / CC75=ディケイ / CC72=リリース。64が既定で0が最短）。
      鳴らす長さも短くする。 */
   beep:{name:'電子音（内蔵スピーカーに近い）', ch:15, pc:80, notes:[81,87,93], gate:30,
-        cc:[[73,0],[75,0],[72,0]]},
+        cc:[[73,0],[75,0],[72,0],      /* 立ち上がり・減衰・余韻を最短に */
+            [1,0],[93,0],              /* モジュレーションとコーラスを切る */
+            /* ★ GM2のNRPNでビブラートの深さを最小にする。矩形波のリード音には
+               音色そのものに揺れが入っていることが多く、これが「素直じゃない」の正体。
+               99=NRPNの上位, 98=下位, 6=値。(1,9)がビブラートの深さで64が既定 */
+            [99,1],[98,9],[6,0]]},
 };
 const clickVoice=()=>CLICK_VOICE[state.clickVoice]||CLICK_VOICE.wood;
 const CLICK_RATIO=[0.55,0.78,1];     /* 音量つまみに対する比 */
