@@ -341,7 +341,7 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
             <span class="counter" id="clickVolVal" style="width:2.6em;text-align:right">52</span>
             <button id="clickDryBtn">残響を抑える</button>
           </div>
-          <p class="hint">電子ピアノ自身に鳴らしてもらうので、音の遅れはMIDIの数msで済みます。強・中・弱は<b>音の高さ</b>で鳴らし分けます。<b>鳴る音は機種によります</b>ので「テスト」で確かめてください。「残響を抑える」はピアノ側の残響の送りを切る指示を出します（クリックには響きが邪魔なため）。</p>
+          <p class="hint">電子ピアノ自身に鳴らしてもらうので、音の遅れはMIDIの数msで済みます。強・中・弱は<b>音の高さ</b>で鳴らし分けます。<b>鳴る音は機種によります</b>ので、音色を切り替えながら「テスト」で聴き比べてください。「残響を抑える」はピアノ側の残響の送りを切る指示を出します（クリックには響きが邪魔なため）。</p>
         </div>
       </div>
       <div class="block">
@@ -1459,25 +1459,31 @@ function drawPanel(){
    高音の声は ch16 に置く。ピアノが弾いた音を送ってくる ch1 と混ざらないようにするため。 */
 /* 音色。強さは「音の高さ」で分ける。ベロシティだけで分けたら、実機（DP603）で
    中と弱の区別が付かなかった。内蔵スピーカー側も 900/1250/1800Hz と高さで分けている。
-   並びは [弱, 中, 強]。 */
+   notes の並びは [弱, 中, 強]。 */
+
+/* 揺れを消す。矩形波などのリード音は音色そのものにビブラートが入っていることが多い。
+   CC1=モジュレーション / CC93=コーラス / NRPN(1,9)=ビブラートの深さ（99→98→6の順）。
+   NRPNは普通のコントロールチェンジだけで送れるので、SysExの許可は要らない。 */
+const CC_CLEAN=[[1,0],[93,0],[99,1],[98,9],[6,0]];
+/* 包絡を最短に。持続音の音色は放っておくと立ち上がりが鈍く余韻も残る。
+   CC73=アタック / CC75=ディケイ / CC72=リリース（64が既定で0が最短）。
+   打楽器系の音色にこれを当てると鳴る前に消えてしまうので、そちらには使わない。 */
+const CC_SHORT=[[73,0],[75,0],[72,0]];
+
+/* 電子ピアノの音源で鳴らす音。ch1 はピアノが弾いた音を送ってくるので避けて ch16 に置く */
+const lead=(name,pc)=>({name, ch:15, pc, notes:[81,87,93], gate:30, cc:[...CC_SHORT,...CC_CLEAN]});
+const perc=(name,pc)=>({name, ch:15, pc, notes:[81,87,93], gate:60, cc:[...CC_CLEAN]});
 const CLICK_VOICE={
-  /* ch10 はGM2でパーカッション。木の音で揃える（クローズドハイハットは音色が異質で、
-     立ち上がりも遅くクリックに向かなかった） */
-  wood:{name:'ウッドブロック（ドラム）', ch:9, notes:[77,76,75], gate:60},
-  /* 内蔵スピーカーの 900 / 1250 / 1800Hz を、矩形波のリード音（GM2の80番）で再現する。
-     A5=880 / E♭6=1245 / A6=1760 とほぼ同じ高さ。ch1 を避けて ch16 に置く。
-     ★ リード音はそのままだと立ち上がりが鈍く余韻も残り、「ピッ」にならない。
-     GM2の音づくり用の指示で、立ち上がり・減衰・余韻をすべて最短にする
-     （CC73=アタック / CC75=ディケイ / CC72=リリース。64が既定で0が最短）。
-     鳴らす長さも短くする。 */
-  beep:{name:'電子音（内蔵スピーカーに近い）', ch:15, pc:80, notes:[81,87,93], gate:30,
-        cc:[[73,0],[75,0],[72,0],      /* 立ち上がり・減衰・余韻を最短に */
-            [1,0],[93,0],              /* モジュレーションとコーラスを切る */
-            /* ★ GM2のNRPNでビブラートの深さを最小にする。矩形波のリード音には
-               音色そのものに揺れが入っていることが多く、これが「素直じゃない」の正体。
-               99=NRPNの上位, 98=下位, 6=値。(1,9)がビブラートの深さで64が既定 */
-            [99,1],[98,9],[6,0]]},
+  wood   :{name:'ウッドブロック', ch:9, notes:[77,76,75], gate:60},   /* ch10のパーカッション */
+  square :lead('矩形波',80),      /* 内蔵スピーカーのクリックに近い */
+  saw    :lead('のこぎり波',81),
+  glock  :perc('グロッケン',9),   /* 澄んだ金属音。立ち上がりが速い */
+  celesta:perc('チェレスタ',8),
+  xylo   :perc('シロフォン',13),  /* 木の音。ウッドブロックに近い質感 */
+  syndrum:perc('シンセドラム',118),
 };
+/* 名前を変えた音色の読み替え */
+const VOICE_RENAME={beep:'square'};
 const clickVoice=()=>CLICK_VOICE[state.clickVoice]||CLICK_VOICE.wood;
 const CLICK_RATIO=[0.55,0.78,1];     /* 音量つまみに対する比 */
 const clickVel=lv=>Math.max(1,Math.min(127,Math.round(state.clickVel*(CLICK_RATIO[lv]??1))));
@@ -1726,7 +1732,7 @@ function loadSaved(){
   state.onComplete =pick(o.onComplete,['loop','stop','reset'],'loop');
   state.clickOut   =pick(o.clickOut,['audio','midi','off'],'audio');
   state.clickVel   =num(o.clickVel,10,127,52);
-  state.clickVoice =pick(o.clickVoice,Object.keys(CLICK_VOICE),'wood');
+  state.clickVoice =pick(VOICE_RENAME[o.clickVoice]??o.clickVoice,Object.keys(CLICK_VOICE),'wood');
   if(typeof o.clickPort==='string') state.clickPort=o.clickPort;
   state.theme      =pick(o.theme,['dark','light'],state.theme);
   state.notation   =pick(o.notation,['std','jazz'],'std');
