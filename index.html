@@ -334,12 +334,14 @@ svg.wheel .nextcell{animation:nextblink .45s ease-out forwards}
             <select id="clickPortSel"></select>
             <button id="clickTestBtn">テスト</button>
           </div>
+          <div class="row" id="clickVoiceRow" style="margin-top:8px"></div>
           <div class="row" style="margin-top:8px;align-items:center;gap:10px">
             <span class="hint" style="margin:0">音量</span>
             <input type="range" id="clickVol" min="10" max="127" step="1" style="width:190px;flex:none">
             <span class="counter" id="clickVolVal" style="width:2.6em;text-align:right">52</span>
+            <button id="clickDryBtn">残響を抑える</button>
           </div>
-          <p class="hint">電子ピアノ自身に鳴らしてもらうので、音の遅れはMIDIの数msで済みます。強・中・弱はウッドブロックとハイハットで鳴らし分けます（MIDIチャンネル10のパーカッション）。<b>鳴る音は機種によります</b>ので「テスト」で確かめてください。</p>
+          <p class="hint">電子ピアノ自身に鳴らしてもらうので、音の遅れはMIDIの数msで済みます。強・中・弱は<b>音の高さ</b>で鳴らし分けます。<b>鳴る音は機種によります</b>ので「テスト」で確かめてください。「残響を抑える」はピアノ側の残響の送りを切る指示を出します（クリックには響きが邪魔なため）。</p>
         </div>
       </div>
       <div class="block">
@@ -681,7 +683,7 @@ const state={
   onComplete:'loop', done:false,   /* 全部押せたときの振る舞い */
   holdKey:false,          /* 1周しても調を変えない */
   clickOut:'audio',       /* クリック音の出し先 'audio'|'midi'|'off' */
-  clickPort:'', clickVel:52,
+  clickPort:'', clickVel:52, clickVoice:'wood', clickDry:true,
   showKb:false,           /* 鍵盤に構成音を薄く出す */
   marks:new Set()         /* 押せたセル。'調のピッチクラス|進行内の位置' */
 };
@@ -883,7 +885,7 @@ function handleMessage(data){
   if(st>=0xF0) return;
   const type=st&0xF0, d1=data[1], d2=data[2];
   /* 自分が鳴らしたクリックが仮想ポート経由で戻ってきても、押した音として扱わない */
-  if(state.clickOut==='midi'&&(st&0x0F)===CLICK_CH) return;
+  if(state.clickOut==='midi'&&(st&0x0F)===clickVoice().ch) return;
   if(type===0x90&&d2>0) onNote(d1,true);
   else if(type===0x80||(type===0x90&&d2===0)) onNote(d1,false);   /* vel0 は保険 */
 }
@@ -1431,6 +1433,12 @@ function drawPanel(){
   document.getElementById('clickMidi').style.display=state.clickOut==='midi'?'':'none';
   document.getElementById('clickVol').value=state.clickVel;
   document.getElementById('clickVolVal').textContent=state.clickVel;
+  document.getElementById('clickDryBtn').classList.toggle('on',state.clickDry);
+  const cvr=document.getElementById('clickVoiceRow');
+  cvr.innerHTML=Object.entries(CLICK_VOICE).map(([k,v])=>
+    `<button class="pat-btn${k===state.clickVoice?' on':''}" data-v="${k}">${v.name}</button>`).join('');
+  cvr.querySelectorAll('button').forEach(b=>
+    b.onclick=()=>{state.clickVoice=b.dataset.v;render();});
   const sel=document.getElementById('clickPortSel');
   const outs=midi?[...midi.outputs.values()]:[];
   sel.innerHTML=outs.length
@@ -1448,12 +1456,30 @@ function drawPanel(){
    ch10 はGM2でパーカッションに割り当てられている。DP603 は GM2 対応なので
    ウッドブロックが鳴るはずだが、機種によるので「テスト」で確かめられるようにしてある。
    高音の声は ch16 に置く。ピアノが弾いた音を送ってくる ch1 と混ざらないようにするため。 */
-const CLICK_CH=9;                    /* GM2でパーカッションに割り当てられている（MIDIの10ch） */
-/* ★ 強さは「音の高さ」で分ける。ベロシティだけで分けたら、実機（DP603）で中と弱の
-   区別が付かなかった。内蔵スピーカー側も 900/1250/1800Hz と高さで分けている。 */
-const CLICK_NOTE=[42,77,76];         /* 弱=クローズドハイハット / 中=低ウッドブロック / 強=高ウッドブロック */
+/* 音色。強さは「音の高さ」で分ける。ベロシティだけで分けたら、実機（DP603）で
+   中と弱の区別が付かなかった。内蔵スピーカー側も 900/1250/1800Hz と高さで分けている。
+   並びは [弱, 中, 強]。 */
+const CLICK_VOICE={
+  /* ch10 はGM2でパーカッション。木の音で揃える（クローズドハイハットは音色が異質で、
+     立ち上がりも遅くクリックに向かなかった） */
+  wood:{name:'ウッドブロック（ドラム）', ch:9, notes:[77,76,75], gate:60},
+  /* 内蔵スピーカーの 900 / 1250 / 1800Hz を、矩形波のリード音（GM2の80番）で再現する。
+     A5=880 / E♭6=1245 / A6=1760 とほぼ同じ高さ。ch1 を避けて ch16 に置く */
+  beep:{name:'電子音（内蔵スピーカーに近い）', ch:15, pc:80, notes:[81,87,93], gate:45},
+};
+const clickVoice=()=>CLICK_VOICE[state.clickVoice]||CLICK_VOICE.wood;
 const CLICK_RATIO=[0.55,0.78,1];     /* 音量つまみに対する比 */
 const clickVel=lv=>Math.max(1,Math.min(127,Math.round(state.clickVel*(CLICK_RATIO[lv]??1))));
+/* 音色の下ごしらえ。鳴らす前に一度だけ送る。
+   残響は機種の初期値だと深すぎてクリックに向かないので、送りを0にできるようにした
+   （CC91=リバーブ送り、CC93=コーラス送り。どちらも標準的な演奏用の指示）。 */
+function clickSetup(out){
+  const v=clickVoice();
+  try{
+    if(v.pc!=null) out.send([0xC0|v.ch,v.pc]);
+    if(state.clickDry){ out.send([0xB0|v.ch,91,0]); out.send([0xB0|v.ch,93,0]); }
+  }catch(e){}
+}
 
 function clickPort(){
   if(!midi) return null;
@@ -1468,12 +1494,12 @@ function clickPort(){
 function midiClick(t,level){
   const out=clickPort();
   if(!out) return false;
-  const note=CLICK_NOTE[level]??CLICK_NOTE[0], vel=clickVel(level);
+  const v=clickVoice(), note=v.notes[level]??v.notes[0], vel=clickVel(level);
   const fire=()=>{
     const at=performance.now()+(t-actx.currentTime)*1000;
     try{
-      out.send([0x90|CLICK_CH,note,vel],at);
-      out.send([0x80|CLICK_CH,note,0],at+60);
+      out.send([0x90|v.ch,note,vel],at);
+      out.send([0x80|v.ch,note,0],at+v.gate);
     }catch(e){}
   };
   const lead=(t-actx.currentTime)*1000-35;
@@ -1484,10 +1510,12 @@ function clickTest(){
   if(!actx) ensureCtx();
   const out=clickPort();
   if(!out){ setMidiState('出力先が見つかりません（MIDIに接続してから選んでください）','ng'); return; }
+  clickSetup(out);
+  const v=clickVoice();
   [2,1,0].forEach((lv,i)=>clickTimers.push(setTimeout(()=>{
-    const note=CLICK_NOTE[lv];
-    try{ out.send([0x90|CLICK_CH,note,clickVel(lv)]);
-         out.send([0x80|CLICK_CH,note,0],performance.now()+60); }catch(e){}
+    const note=v.notes[lv];
+    try{ out.send([0x90|v.ch,note,clickVel(lv)]);
+         out.send([0x80|v.ch,note,0],performance.now()+v.gate); }catch(e){}
   },i*450)));
 }
 function clearClickTimers(){ clickTimers.forEach(clearTimeout); clickTimers=[]; }
@@ -1574,6 +1602,7 @@ function play(){
   ensureCtx();
   const gen=++playGen;
   state.playing=true; beat=-state.countIn; uiQ=[]; metroStarted=false; metroBeatN=0;
+  if(state.clickOut==='midi'){ const o=clickPort(); if(o) clickSetup(o); }
   state.countdown=state.countIn; state.playChord=state.countIn?null:0;
   render();
   let started=false;
@@ -1655,7 +1684,7 @@ function setPractice(m){
 const SAVE_KEY='chord_practice_midi.v2';
 const SAVE_FIELDS=['practice','bassRule','graceMs','settleMs','showNotes',
   'theme','notation','showDeg','simplifyAcc','showPath','advanced',
-  'earlyMs','onComplete','holdKey','showKb','clickOut','clickPort','clickVel','bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
+  'earlyMs','onComplete','holdKey','showKb','clickOut','clickPort','clickVel','clickVoice','clickDry','bpm','beatsPerChord','countIn','patId','coverAll','shiftV','triSharp',
   'mode','startFifth','presetTab','chords'];
 let saveT=null;
 function save(){
@@ -1685,6 +1714,7 @@ function loadSaved(){
   state.onComplete =pick(o.onComplete,['loop','stop','reset'],'loop');
   state.clickOut   =pick(o.clickOut,['audio','midi','off'],'audio');
   state.clickVel   =num(o.clickVel,10,127,52);
+  state.clickVoice =pick(o.clickVoice,Object.keys(CLICK_VOICE),'wood');
   if(typeof o.clickPort==='string') state.clickPort=o.clickPort;
   state.theme      =pick(o.theme,['dark','light'],state.theme);
   state.notation   =pick(o.notation,['std','jazz'],'std');
@@ -1696,7 +1726,7 @@ function loadSaved(){
   state.countIn    =pick(num(o.countIn,0,8,4),[0,4,8],4);
   state.presetTab  =num(o.presetTab,0,PRESETS.length-1,0)|0;
   state.startFifth =keyOrder().includes(+o.startFifth)?+o.startFifth:0;
-  for(const k of ['showNotes','showDeg','simplifyAcc','showPath','coverAll','triSharp','advanced','holdKey','showKb'])
+  for(const k of ['showNotes','showDeg','simplifyAcc','showPath','coverAll','triSharp','advanced','holdKey','showKb','clickDry'])
     if(k in o) state[k]=!!o[k];
   /* triSharp を戻したあとに startFifth を整合させる（F♯/G♭ は同じ位置） */
   if(Math.abs(state.startFifth)===6) state.startFifth=state.triSharp?6:-6;
@@ -1708,6 +1738,7 @@ document.querySelectorAll('#hintBtn,#hintBtn2').forEach(b=>
   b.onclick=()=>{state.showNotes=!state.showNotes;render();});
 document.getElementById('holdKeyBtn').onclick=()=>{state.holdKey=!state.holdKey;render();};
 document.getElementById('clickTestBtn').onclick=clickTest;
+document.getElementById('clickDryBtn').onclick=()=>{state.clickDry=!state.clickDry;render();};
 document.getElementById('clickVol').oninput=e=>{
   state.clickVel=Math.max(10,Math.min(127,+e.target.value||52));
   document.getElementById('clickVolVal').textContent=state.clickVel; saveSoon();};
@@ -1730,7 +1761,7 @@ addEventListener('resize',()=>drawKeyboard());
 window.__inject=bytes=>handleMessage(Uint8Array.from(bytes));
 window.__dbg={state,held,target,judge,curTarget,render,renderLight,advanceMidi,afterAdvance,
   clearMarks,markOf,curFifth,chordFifth,noteName:nnSimple,pcOf,PRESETS,QUALITIES,TENSIONS,ALL_Q,Q_INT,qLabel,setPractice,
-  buildSequence,drawJudge,metroAngle,metroPulse,metroTick,CLICK_CH,CLICK_NOTE,clickVel,clickPort,midiClick,clickTest,ensureCtx,
+  buildSequence,drawJudge,metroAngle,metroPulse,metroTick,CLICK_VOICE,clickVoice,clickVel,clickSetup,clickPort,midiClick,clickTest,ensureCtx,
   setMidi:m=>{midi=m;},clickTimerCount:()=>clickTimers.length,attachMidi,
   play:()=>play(), stop:()=>stop(),
   reset(){held.clear();clearBad();settleUntil=0;needReplay=false;render();}};
