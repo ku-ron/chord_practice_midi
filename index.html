@@ -1464,8 +1464,13 @@ const CLICK_VOICE={
      立ち上がりも遅くクリックに向かなかった） */
   wood:{name:'ウッドブロック（ドラム）', ch:9, notes:[77,76,75], gate:60},
   /* 内蔵スピーカーの 900 / 1250 / 1800Hz を、矩形波のリード音（GM2の80番）で再現する。
-     A5=880 / E♭6=1245 / A6=1760 とほぼ同じ高さ。ch1 を避けて ch16 に置く */
-  beep:{name:'電子音（内蔵スピーカーに近い）', ch:15, pc:80, notes:[81,87,93], gate:45},
+     A5=880 / E♭6=1245 / A6=1760 とほぼ同じ高さ。ch1 を避けて ch16 に置く。
+     ★ リード音はそのままだと立ち上がりが鈍く余韻も残り、「ピッ」にならない。
+     GM2の音づくり用の指示で、立ち上がり・減衰・余韻をすべて最短にする
+     （CC73=アタック / CC75=ディケイ / CC72=リリース。64が既定で0が最短）。
+     鳴らす長さも短くする。 */
+  beep:{name:'電子音（内蔵スピーカーに近い）', ch:15, pc:80, notes:[81,87,93], gate:30,
+        cc:[[73,0],[75,0],[72,0]]},
 };
 const clickVoice=()=>CLICK_VOICE[state.clickVoice]||CLICK_VOICE.wood;
 const CLICK_RATIO=[0.55,0.78,1];     /* 音量つまみに対する比 */
@@ -1477,7 +1482,8 @@ function clickSetup(out){
   const v=clickVoice();
   try{
     if(v.pc!=null) out.send([0xC0|v.ch,v.pc]);
-    if(state.clickDry){ out.send([0xB0|v.ch,91,0]); out.send([0xB0|v.ch,93,0]); }
+    (v.cc||[]).forEach(([n,x])=>out.send([0xB0|v.ch,n,x]));   /* 音色そのものの整え */
+    if(state.clickDry){ out.send([0xB0|v.ch,91,0]); out.send([0xB0|v.ch,93,0]); }  /* 響きの整え */
   }catch(e){}
 }
 
